@@ -3,3 +3,4 @@
 *.pdb
 *.exe
 *.ini
+/ImClass/x64

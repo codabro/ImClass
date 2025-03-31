@@ -21,6 +21,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    io.ConfigViewportsNoDefaultParent = true;
     
     ImGui::StyleColorsDark();
 
@@ -31,9 +32,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
+    bool open = true;
+
     MSG msg;
     ZeroMemory(&msg, sizeof(msg));
-    while (msg.message != WM_QUIT) {
+    while (msg.message != WM_QUIT && open) {
         if (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
@@ -44,8 +47,37 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("Hello, world!");
-        ImGui::Text("This is an ImGui window with docking enabled.");
+        ImGui::ShowDemoWindow();
+
+        ImGui::Begin("ImClass", &open, ImGuiWindowFlags_MenuBar);
+        if (ImGui::BeginMenuBar()) {
+            if (ImGui::BeginMenu("File")) {
+                ImGui::MenuItem("Test1");
+                ImGui::MenuItem("Test2");
+                ImGui::MenuItem("Test3");
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Sigma")) {
+                ImGui::EndMenu();
+            }
+            ImGui::EndMenuBar();
+
+            ImGui::Columns(2);
+
+            ImGui::SetColumnOffset(1, 150);
+
+            float columnOffset = ImGui::GetColumnOffset(1);
+
+            ImVec2 wndSize = ImGui::GetWindowSize();
+
+            ImGui::BeginChild("ClassesChild", ImVec2(columnOffset - 15, wndSize.y - 54), 1);
+            ImGui::EndChild();
+
+            ImGui::NextColumn();
+
+            ImGui::BeginChild("MemoryViewChild", ImVec2(wndSize.x - columnOffset - 16, wndSize.y - 54), 1);
+            ImGui::EndChild();
+        }
         ImGui::End();
 
         ImGui::Render();
