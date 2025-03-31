@@ -41,6 +41,14 @@ bool mem::getProcessList() {
 
     if (Process32First(hSnapshot, &processEntry)) {
         do {
+            if (processEntry.th32ProcessID == 0) {
+                continue;
+            }
+
+            if (!wcscmp(processEntry.szExeFile, L"System") || !wcscmp(processEntry.szExeFile, L"Registry")) {
+                continue;
+            }
+
             processSnapshot snapshot{ processEntry.szExeFile, processEntry.th32ProcessID };
             processes.push_back(snapshot);
         } while (Process32Next(hSnapshot, &processEntry));
