@@ -4,6 +4,7 @@
 
 #include <directx.h>
 #include <memory.h>
+#include <classes.h>
 #include <ui.h>
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {

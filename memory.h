@@ -121,6 +121,10 @@ bool mem::initProcess(DWORD pid) {
 template <typename T>
 T Read(uintptr_t address) {
     T response{};
+    if (!address) {
+        return response;
+    }
+
     mem::read(address, &response, sizeof(T));
 
     return response;
@@ -130,3 +134,12 @@ template <typename T>
 bool Write(uintptr_t address, const T& value) {
     return mem::write(address, &value, sizeof(T));
 }
+
+template <int n>
+struct readBuf {
+    BYTE data[n] = {};
+
+    readBuf() {
+        memset(data, 0, n);
+    }
+};

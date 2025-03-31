@@ -12,8 +12,6 @@ namespace ui {
     bool processWindow = false;
     char addressInput[17] = "0";
 
-    uintptr_t currentAddress = 0;
-
     ImVec2 mainPos;
 
     void init(HWND hwnd);
@@ -22,17 +20,19 @@ namespace ui {
 	void render();
     bool searchMatches(std::string str, std::string term);
     uintptr_t toAddress(std::string address);
-    std::string toHexString(uintptr_t address);
+    std::string toHexString(uintptr_t address, int width = 0);
     bool isValidHex(std::string& str);
-    void updateAddress(uintptr_t newAddress);
+    void updateAddress(uintptr_t newAddress, uintptr_t* dest = 0);
 }
 
-void ui::updateAddress(uintptr_t newAddress) {
+void ui::updateAddress(uintptr_t newAddress, uintptr_t* dest) {
     if (newAddress != 0 && strcmp(addressInput, "0")) {
-        currentAddress = newAddress;
+        if (dest) {
+            *dest = newAddress;
+        }
     }
     
-    std::string hexString = toHexString(currentAddress);
+    std::string hexString = toHexString(dest ? *dest : newAddress);
     memset(addressInput, 0, sizeof(addressInput));
     memcpy(addressInput, hexString.data(), hexString.size());
 }
@@ -62,7 +62,17 @@ void ui::renderMain() {
         ImVec2 wndSize = ImGui::GetWindowSize();
 
         ImGui::BeginChild("ClassesChild", ImVec2(columnOffset - 15, wndSize.y - 54), 1);
+        static int selectedClass = 0;
+        for (int i = 0; i < g_Classes.size(); i++) {
+            auto& lClass = g_Classes[i];
+            if (ImGui::Selectable(lClass.name, (i == selectedClass))) {
+                selectedClass = i;
+                updateAddress(lClass.address);
+            }
+        }
         ImGui::EndChild();
+
+        uClass& sClass = g_Classes[selectedClass];
 
         ImGui::NextColumn();
 
@@ -70,7 +80,7 @@ void ui::renderMain() {
         ImGui::SetNextItemWidth(150);
         if (ImGui::InputText("Address", addressInput, sizeof(addressInput), ImGuiInputTextFlags_EnterReturnsTrue)) {
             uintptr_t newAddress = toAddress(addressInput);
-            updateAddress(newAddress);
+            updateAddress(newAddress, &sClass.address);
         }
 
         static bool oInputFocused = false;
@@ -82,10 +92,16 @@ void ui::renderMain() {
 
         bool inputFocused = (GImGui->ActiveId == id);
         if (oInputFocused && !inputFocused) {
-            updateAddress(currentAddress);
+            updateAddress(sClass.address);
         }
 
         oInputFocused = inputFocused;
+
+        //auto drawList = ImGui::GetWindowDrawList();
+        ImGui::BeginChild("MemView");
+        auto buf = Read<readBuf<4096>>(sClass.address);
+        sClass.drawNodes(buf.data, 4096);
+        ImGui::EndChild();
 
         ImGui::EndChild();
     }
@@ -179,9 +195,9 @@ uintptr_t ui::toAddress(std::string address) {
     return result;
 }
 
-std::string ui::toHexString(uintptr_t address) {
+std::string ui::toHexString(uintptr_t address, int width) {
     std::stringstream ss;
-    ss << std::hex << std::uppercase << address;
+    ss << std::hex << std::uppercase << std::setw(width) << std::setfill('0') << address;
     return ss.str();
 }
 
