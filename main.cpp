@@ -1,7 +1,9 @@
 #include <Windows.h>
 #include <iostream>
+#include <string>
 
 #include <directx.h>
+#include <memory.h>
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     WNDCLASS wc = { CS_CLASSDC, WndProc, 0, 0, hInstance, nullptr, nullptr, nullptr, nullptr, L"ImClassWnd" };
