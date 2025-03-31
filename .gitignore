@@ -1,0 +1,5 @@
+*.vsidx
+/.vs
+*.pdb
+*.exe
+*.ini
