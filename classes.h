@@ -58,6 +58,7 @@ public:
 	void drawNodes(BYTE* data, int len);
 	void drawStringBytes(int i, BYTE* data, int pos, int size);
 	void drawOffset(int i, int pos);
+	void drawAddress(int i, int pos);
 	void drawBytes(int i, BYTE* data, int pos, int size);
 	void drawNumber(int i, uintptr_t num, int* pad);
 	void drawFloat(int i, float num, int* pad = 0);
@@ -68,7 +69,7 @@ public:
 void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 	pad += 15;
 
-	ImGui::SetCursorPos(ImVec2(320 + pad, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(455 + pad, 10 + 12 * i));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 162, 0).Value);
 	ImGui::Text(("0x" + ui::toHexString(num, 0)).c_str());
 	ImGui::PopStyleColor();
@@ -84,7 +85,7 @@ void uClass::drawDouble(int i, double num, int* pad) {
 		*pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 	}
 
-	ImGui::SetCursorPos(ImVec2(320, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(455, 10 + 12 * i));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
@@ -100,7 +101,7 @@ void uClass::drawFloat(int i, float num, int* pad) {
 		*pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 	}
 
-	ImGui::SetCursorPos(ImVec2(320, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(455, 10 + 12 * i));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
@@ -113,7 +114,7 @@ void uClass::drawNumber(int i, uintptr_t num, int* pad) {
 
 	std::string toDraw = std::to_string(num);
 
-	ImGui::SetCursorPos(ImVec2(320 + *pad, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(455 + *pad, 10 + 12 * i));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 218, 133).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
@@ -123,15 +124,22 @@ void uClass::drawNumber(int i, uintptr_t num, int* pad) {
 
 void uClass::drawOffset(int i, int pos) {
 	ImGui::SetCursorPos(ImVec2(0, 10 + 12 * i));
-	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.7f, .7f, .7f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.9f, .9f, .9f, 1.f));
 	ImGui::Text(ui::toHexString(pos, 4).c_str());
+	ImGui::PopStyleColor();
+}
+
+void uClass::drawAddress(int i, int pos) {
+	ImGui::SetCursorPos(ImVec2(50, 10 + 12 * i));
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.7f, .7f, .7f, 1.f));
+	ImGui::Text(ui::toHexString(this->address + pos, 16).c_str());
 	ImGui::PopStyleColor();
 }
 
 void uClass::drawBytes(int i, BYTE* data, int pos, int size) {
 	for (int j = 0; j < size; j++) {
 		BYTE byte = data[pos];
-		ImGui::SetCursorPos(ImVec2(150 + j * 20, 10 + i * 12));
+		ImGui::SetCursorPos(ImVec2(285 + j * 20, 10 + i * 12));
 		ImGui::Text(ui::toHexString(byte, 2).c_str());
 		pos++;
 	}
@@ -140,7 +148,7 @@ void uClass::drawBytes(int i, BYTE* data, int pos, int size) {
 void uClass::drawStringBytes(int i, BYTE* data, int pos, int size) {
 	for (int j = 0; j < size; j++) {
 		BYTE byte = data[pos];
-		ImGui::SetCursorPos(ImVec2(45 + j * 12, 10 + i * 12));
+		ImGui::SetCursorPos(ImVec2(180 + j * 12, 10 + i * 12));
 		if (byte > 32 && byte < 127) {
 			ImGui::Text("%c", byte);
 		}
@@ -162,6 +170,7 @@ void uClass::drawNodes(BYTE* data, int len) {
 		auto& node = nodes[i];
 
 		drawOffset(i, counter);
+		drawAddress(i, counter);
 
 		size_t lCounter = 0;
 		uintptr_t num = 0;

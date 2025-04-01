@@ -102,7 +102,6 @@ void ui::renderMain() {
 
         oInputFocused = inputFocused;
 
-        //auto drawList = ImGui::GetWindowDrawList();
         ImGui::BeginChild("MemView");
         auto buf = Read<readBuf<4096>>(sClass.address);
         sClass.drawNodes(buf.data, 4096);
