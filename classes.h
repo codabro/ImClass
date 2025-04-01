@@ -16,6 +16,13 @@ enum nodeType {
 	node_hex64
 };
 
+uint8_t typeSizes[] = {
+	1,
+	2,
+	4,
+	8
+};
+
 class nodeBase {
 public:
 	char name[64];
@@ -64,7 +71,34 @@ public:
 	void drawFloat(int i, float num, int* pad = 0);
 	void drawDouble(int i, double num, int* pad = 0);
 	void drawHexNumber(int i, uintptr_t num, int pad);
+	void changeType(int i, nodeType newType);
 };
+
+void uClass::changeType(int i, nodeType newType) {
+	auto node = this->nodes[i];
+	auto oldSize = node.size;
+	auto typeSize = typeSizes[newType];
+
+	nodes.erase(nodes.begin() + i);
+	nodes.insert(nodes.begin() + i, { 0, newType, typeSize });
+	int inserted = 1;
+
+	int sizeDiff = oldSize - typeSize;
+	while (sizeDiff > 0) {
+		if (sizeDiff >= 4) {
+			sizeDiff = sizeDiff % 4;
+			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex32, 4 });
+		}
+		else if (sizeDiff >= 2) {
+			sizeDiff = sizeDiff % 2;
+			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex16, 2 });
+		}
+		else if (sizeDiff >= 1) {
+			sizeDiff = sizeDiff - 1;
+			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex8, 1 });
+		}
+	}
+}
 
 void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 	pad += 15;
@@ -168,6 +202,33 @@ void uClass::drawNodes(BYTE* data, int len) {
 	size_t counter = 0;
 	for (int i = 0; i < nodes.size(); i++) {
 		auto& node = nodes[i];
+
+		ImGui::SetCursorPos(ImVec2(0, 14 + i * 12));
+		ImGui::Selectable(("##Controller_" + std::to_string(i)).c_str(), false, 0, ImVec2(0, 6));
+		if (ImGui::BeginPopupContextItem(("##NodePopup_" + std::to_string(i)).c_str())) {
+			if (ImGui::BeginMenu("Change Type")) {
+				if (ImGui::Selectable("Hex8")) {
+					changeType(i, node_hex8);
+				}
+				if (ImGui::Selectable("Hex16")) {
+					changeType(i, node_hex16);
+				}
+				if (ImGui::Selectable("Hex32")) {
+					changeType(i, node_hex32);
+				}
+				if (ImGui::Selectable("Hex64")) {
+					changeType(i, node_hex64);
+				}
+				ImGui::EndMenu();
+			}
+			if (ImGui::Selectable("Delete")) {
+				nodes.erase(nodes.begin() + i);
+			}
+			if (ImGui::Selectable("Copy Address")) {
+				ImGui::SetClipboardText(ui::toHexString(this->address + counter, 0).c_str());
+			}
+			ImGui::EndPopup();
+		}
 
 		drawOffset(i, counter);
 		drawAddress(i, counter);
