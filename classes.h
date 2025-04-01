@@ -13,14 +13,33 @@ enum nodeType {
 	node_hex8,
 	node_hex16,
 	node_hex32,
-	node_hex64
+	node_hex64,
+	node_int8,
+	node_int16,
+	node_int32,
+	node_int64
 };
 
 uint8_t typeSizes[] = {
 	1,
 	2,
 	4,
+	8,
+	1,
+	2,
+	4,
 	8
+};
+
+char typeNames[][21] = {
+	"Hex8",
+	"Hex16",
+	"Hex32",
+	"Hex64",
+	"Int8",
+	"Int16",
+	"Int32",
+	"Int64"
 };
 
 class nodeBase {
@@ -50,6 +69,7 @@ public:
 	char addressInput[256];
 	std::vector<nodeBase> nodes;
 	uintptr_t address = 0;
+	int varCounter = 0;
 
 	uClass() {
 		for (int i = 0; i < 50; i++) {
@@ -76,7 +96,29 @@ public:
 	void drawControllers(int i, int counter);
 	void changeType(int i, nodeType newType, bool selectNew = false, int* newNodes = 0);
 	void changeType(nodeType newType);
+
+	void drawInteger(int i, int64_t value, nodeType type);
 };
+
+void uClass::drawInteger(int i, int64_t value, nodeType type) {
+	int y = 10 + 12 * i;
+	auto& node = nodes[i];
+	ImVec2 nameSize = ImGui::CalcTextSize(node.name);
+	ImVec2 typenameSize = ImGui::CalcTextSize(typeNames[type]);
+
+	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 218, 133).Value);
+	ImGui::SetCursorPos(ImVec2(180, y));
+	ImGui::Text(typeNames[type]);
+	ImGui::PopStyleColor();
+
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.9f, .9f, .9f, 1.f));
+	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + 15, y));
+	ImGui::Text(node.name);
+	ImGui::PopStyleColor();
+
+	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + nameSize.x + 30, y));
+	ImGui::Text("=  %lld", value);
+}
 
 void uClass::changeType(nodeType newType) {
 	for (int i = 0; i < nodes.size(); i++) {
@@ -95,7 +137,7 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 	auto typeSize = typeSizes[newType];
 
 	nodes.erase(nodes.begin() + i);
-	nodes.insert(nodes.begin() + i, { 0, newType, selectNew });
+	nodes.insert(nodes.begin() + i, { (newType > node_hex64) ? ("Var_" + std::to_string(varCounter++)).c_str() : 0, newType, selectNew});
 	int inserted = 1;
 
 	int sizeDiff = oldSize - typeSize;
@@ -263,7 +305,8 @@ void uClass::drawControllers(int i, int counter) {
 		}
 
 		if (ImGui::BeginMenu("Change Type")) {
-			if (ImGui::Selectable("Hex8")) {
+			// the imvec2 just ensures the width of this menu
+			if (ImGui::Selectable("Hex8", false, 0, ImVec2(100, 0))) {
 				changeType(node_hex8);
 			}
 			if (ImGui::Selectable("Hex16")) {
@@ -275,6 +318,22 @@ void uClass::drawControllers(int i, int counter) {
 			if (ImGui::Selectable("Hex64")) {
 				changeType(node_hex64);
 			}
+
+			ImGui::Separator();
+			
+			if (ImGui::Selectable("Int64")) {
+				changeType(node_int64);
+			}
+			if (ImGui::Selectable("Int32")) {
+				changeType(node_int32);
+			}
+			if (ImGui::Selectable("Int16")) {
+				changeType(node_int16);
+			}
+			if (ImGui::Selectable("Int8")) {
+				changeType(node_int8);
+			}
+
 			ImGui::EndMenu();
 		}
 		if (ImGui::Selectable("Delete")) {
@@ -353,6 +412,22 @@ void uClass::drawNodes(BYTE* data, int len) {
 			drawHexNumber(i, num, pad);
 
 			counter += 8;
+			break;
+		case node_int64:
+			drawInteger(i, *(int64_t*)((uintptr_t)data + counter), node_int64);
+			counter += 8;
+			break;
+		case node_int32:
+			drawInteger(i, *(int32_t*)((uintptr_t)data + counter), node_int32);
+			counter += 4;
+			break;
+		case node_int16:
+			drawInteger(i, *(int16_t*)((uintptr_t)data + counter), node_int16);
+			counter += 2;
+			break;
+		case node_int8:
+			drawInteger(i, *(int8_t*)((uintptr_t)data + counter), node_int8);
+			counter += 1;
 			break;
 		}
 	}
