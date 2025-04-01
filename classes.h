@@ -90,7 +90,7 @@ void uClass::drawDouble(int i, double num, int* pad) {
 void uClass::drawFloat(int i, float num, int* pad) {
 	std::string toDraw = std::format("{:.3f}", num);
 	if (toDraw.size() > 20) {
-		toDraw = "###";
+		toDraw = "#####";
 	}
 
 	if (pad) {
