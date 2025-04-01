@@ -29,14 +29,14 @@ public:
 	nodeType type;
 	uint8_t size;
 
-	nodeBase(const char* aName, nodeType aType, uint8_t aSize) {
+	nodeBase(const char* aName, nodeType aType) {
 		memset(name, 0, sizeof(name));
 		if (aName) {
 			memcpy(name, aName, sizeof(aName));
 		}
 
 		type = aType;
-		size = aSize;
+		size = typeSizes[aType];
 	}
 };
 
@@ -51,7 +51,7 @@ public:
 
 	uClass() {
 		for (int i = 0; i < 50; i++) {
-			nodeBase node = {0, node_hex64, 8};
+			nodeBase node = {0, node_hex64};
 			nodes.push_back(node);
 		}
 		memset(name, 0, sizeof(name));
@@ -80,22 +80,22 @@ void uClass::changeType(int i, nodeType newType) {
 	auto typeSize = typeSizes[newType];
 
 	nodes.erase(nodes.begin() + i);
-	nodes.insert(nodes.begin() + i, { 0, newType, typeSize });
+	nodes.insert(nodes.begin() + i, { 0, newType });
 	int inserted = 1;
 
 	int sizeDiff = oldSize - typeSize;
 	while (sizeDiff > 0) {
 		if (sizeDiff >= 4) {
 			sizeDiff = sizeDiff % 4;
-			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex32, 4 });
+			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex32 });
 		}
 		else if (sizeDiff >= 2) {
 			sizeDiff = sizeDiff % 2;
-			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex16, 2 });
+			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex16 });
 		}
 		else if (sizeDiff >= 1) {
 			sizeDiff = sizeDiff - 1;
-			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex8, 1 });
+			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex8 });
 		}
 	}
 }
