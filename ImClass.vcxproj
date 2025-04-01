@@ -167,6 +167,7 @@
     <ClInclude Include="include\imgui\imstb_rectpack.h" />
     <ClInclude Include="include\imgui\imstb_textedit.h" />
     <ClInclude Include="include\imgui\imstb_truetype.h" />
+    <ClInclude Include="parser.h" />
     <ClInclude Include="memory.h" />
     <ClInclude Include="ui.h" />
   </ItemGroup>
