@@ -28,8 +28,9 @@ public:
 	char name[64];
 	nodeType type;
 	uint8_t size;
+	bool selected = false;
 
-	nodeBase(const char* aName, nodeType aType) {
+	nodeBase(const char* aName, nodeType aType, bool aSelected = false) {
 		memset(name, 0, sizeof(name));
 		if (aName) {
 			memcpy(name, aName, sizeof(aName));
@@ -37,6 +38,7 @@ public:
 
 		type = aType;
 		size = typeSizes[aType];
+		selected = aSelected;
 	}
 };
 
@@ -71,32 +73,49 @@ public:
 	void drawFloat(int i, float num, int* pad = 0);
 	void drawDouble(int i, double num, int* pad = 0);
 	void drawHexNumber(int i, uintptr_t num, int pad);
-	void changeType(int i, nodeType newType);
+	void drawControllers(int i, int counter);
+	void changeType(int i, nodeType newType, bool selectNew = false, int* newNodes = 0);
+	void changeType(nodeType newType);
 };
 
-void uClass::changeType(int i, nodeType newType) {
+void uClass::changeType(nodeType newType) {
+	for (int i = 0; i < nodes.size(); i++) {
+		auto& node = nodes[i];
+		if (node.selected) {
+			int newNodes;
+			changeType(i, newType, true, &newNodes);
+			i += newNodes;
+		}
+	}
+}
+
+void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) {
 	auto node = this->nodes[i];
 	auto oldSize = node.size;
 	auto typeSize = typeSizes[newType];
 
 	nodes.erase(nodes.begin() + i);
-	nodes.insert(nodes.begin() + i, { 0, newType });
+	nodes.insert(nodes.begin() + i, { 0, newType, selectNew });
 	int inserted = 1;
 
 	int sizeDiff = oldSize - typeSize;
 	while (sizeDiff > 0) {
 		if (sizeDiff >= 4) {
 			sizeDiff = sizeDiff % 4;
-			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex32 });
+			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex32, selectNew });
 		}
 		else if (sizeDiff >= 2) {
 			sizeDiff = sizeDiff % 2;
-			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex16 });
+			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex16, selectNew });
 		}
 		else if (sizeDiff >= 1) {
 			sizeDiff = sizeDiff - 1;
-			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex8 });
+			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex8, selectNew });
 		}
+	}
+
+	if (newNodes) {
+		*newNodes = inserted - 1;
 	}
 }
 
@@ -198,38 +217,86 @@ void uClass::drawStringBytes(int i, BYTE* data, int pos, int size) {
 	}
 }
 
+void uClass::drawControllers(int i, int counter) {
+	auto& node = nodes[i];
+
+	ImGui::SetCursorPos(ImVec2(0, 14 + i * 12));
+	if (ImGui::Selectable(("##Controller_" + std::to_string(i)).c_str(), node.selected, 0, ImVec2(0, 6))) {
+		if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
+			node.selected = !node.selected;
+		}
+		else if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
+			int min = INT_MAX;
+			for (int j = 0; j < nodes.size(); j++) {
+				if (nodes[j].selected) {
+					if (j < min) {
+						min = j;
+					}
+				}
+			}
+
+			if (min > i) {
+				for (int j = min; j >= i; j--) {
+					nodes[j].selected = true;
+				}
+			}
+			else {
+				for (int j = min; j <= i; j++) {
+					nodes[j].selected = true;
+				}
+			}
+		}
+		else {
+			for (int j = 0; j < nodes.size(); j++) {
+				nodes[j].selected = false;
+			}
+			nodes[i].selected = true;
+		}
+	}
+
+	if (ImGui::BeginPopupContextItem(("##NodePopup_" + std::to_string(i)).c_str())) {
+		if (!node.selected) {
+			for (int j = 0; j < nodes.size(); j++) {
+				nodes[j].selected = false;
+			}
+			nodes[i].selected = true;
+		}
+
+		if (ImGui::BeginMenu("Change Type")) {
+			if (ImGui::Selectable("Hex8")) {
+				changeType(node_hex8);
+			}
+			if (ImGui::Selectable("Hex16")) {
+				changeType(node_hex16);
+			}
+			if (ImGui::Selectable("Hex32")) {
+				changeType(node_hex32);
+			}
+			if (ImGui::Selectable("Hex64")) {
+				changeType(node_hex64);
+			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::Selectable("Delete")) {
+			for (int j = nodes.size() - 1; j >= 0; j--) {
+				if (nodes[j].selected) {
+					nodes.erase(nodes.begin() + j);
+				}
+			}
+		}
+		if (ImGui::Selectable("Copy Address")) {
+			ImGui::SetClipboardText(ui::toHexString(this->address + counter, 0).c_str());
+		}
+		ImGui::EndPopup();
+	}
+}
+
 void uClass::drawNodes(BYTE* data, int len) {
 	size_t counter = 0;
 	for (int i = 0; i < nodes.size(); i++) {
 		auto& node = nodes[i];
 
-		ImGui::SetCursorPos(ImVec2(0, 14 + i * 12));
-		ImGui::Selectable(("##Controller_" + std::to_string(i)).c_str(), false, 0, ImVec2(0, 6));
-		if (ImGui::BeginPopupContextItem(("##NodePopup_" + std::to_string(i)).c_str())) {
-			if (ImGui::BeginMenu("Change Type")) {
-				if (ImGui::Selectable("Hex8")) {
-					changeType(i, node_hex8);
-				}
-				if (ImGui::Selectable("Hex16")) {
-					changeType(i, node_hex16);
-				}
-				if (ImGui::Selectable("Hex32")) {
-					changeType(i, node_hex32);
-				}
-				if (ImGui::Selectable("Hex64")) {
-					changeType(i, node_hex64);
-				}
-				ImGui::EndMenu();
-			}
-			if (ImGui::Selectable("Delete")) {
-				nodes.erase(nodes.begin() + i);
-			}
-			if (ImGui::Selectable("Copy Address")) {
-				ImGui::SetClipboardText(ui::toHexString(this->address + counter, 0).c_str());
-			}
-			ImGui::EndPopup();
-		}
-
+		drawControllers(i, counter);
 		drawOffset(i, counter);
 		drawAddress(i, counter);
 
@@ -239,6 +306,7 @@ void uClass::drawNodes(BYTE* data, int len) {
 		double doubleNum;
 		int pad = 0;
 
+		// this kinda sucks
 		switch (node.type) {
 		case node_hex8:
 			drawStringBytes(i, data, counter, 1);
