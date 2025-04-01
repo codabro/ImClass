@@ -4,6 +4,7 @@
 
 #include <directx.h>
 #include <memory.h>
+#include <parser.h>
 #include <classes.h>
 #include <ui.h>
 
