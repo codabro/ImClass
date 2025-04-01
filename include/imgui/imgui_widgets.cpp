@@ -5375,7 +5375,7 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
                 draw_pos.x = ImMin(draw_pos.x, frame_bb.Max.x - CalcTextSize(buf_display, NULL).x - style.FramePadding.x);
 
             const ImVec2 draw_scroll = /*state ? ImVec2(state->Scroll.x, 0.0f) :*/ ImVec2(0.0f, 0.0f); // Preserve scroll when inactive?
-            ImU32 col = GetColorU32(is_displaying_hint ? ImGuiCol_TextDisabled : ImGuiCol_Text);
+            ImU32 col = GetColorU32(!render_cursor ? ImGuiCol_TextDisabled : (is_displaying_hint ? ImGuiCol_TextDisabled : ImGuiCol_Text));
             draw_window->DrawList->AddText(g.Font, g.FontSize, draw_pos - draw_scroll, col, buf_display, buf_display_end, 0.0f, is_multiline ? NULL : &clip_rect);
         }
     }

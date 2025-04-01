@@ -41,6 +41,14 @@ bool mem::getProcessList() {
 
     if (Process32First(hSnapshot, &processEntry)) {
         do {
+            if (processEntry.th32ProcessID == 0) {
+                continue;
+            }
+
+            if (!wcscmp(processEntry.szExeFile, L"System") || !wcscmp(processEntry.szExeFile, L"Registry")) {
+                continue;
+            }
+
             processSnapshot snapshot{ processEntry.szExeFile, processEntry.th32ProcessID };
             processes.push_back(snapshot);
         } while (Process32Next(hSnapshot, &processEntry));
@@ -71,7 +79,7 @@ bool mem::getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info) 
 
     CloseHandle(snapshot);
 
-    return true;
+    return false;
 }
 
 HANDLE mem::openHandle(DWORD pid) {
@@ -113,6 +121,10 @@ bool mem::initProcess(DWORD pid) {
 template <typename T>
 T Read(uintptr_t address) {
     T response{};
+    if (!address) {
+        return response;
+    }
+
     mem::read(address, &response, sizeof(T));
 
     return response;
@@ -122,3 +134,12 @@ template <typename T>
 bool Write(uintptr_t address, const T& value) {
     return mem::write(address, &value, sizeof(T));
 }
+
+template <int n>
+struct readBuf {
+    BYTE data[n] = {};
+
+    readBuf() {
+        memset(data, 0, n);
+    }
+};
