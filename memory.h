@@ -79,7 +79,7 @@ bool mem::getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info) 
 
     CloseHandle(snapshot);
 
-    return true;
+    return false;
 }
 
 HANDLE mem::openHandle(DWORD pid) {

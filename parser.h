@@ -3,11 +3,15 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <vector>
 
+namespace ui {
+	extern uintptr_t toAddress(std::string address);
+	extern bool isValidHex(std::string& str);
+}
 
-namespace AddressParser
-{
-	uintptr_t parseLibrary(const char* str);
+namespace addressParser {
+	uintptr_t parseInput(const char* str);
 }
 
 inline std::list<std::string> g_fileEndings = {
@@ -15,9 +19,7 @@ inline std::list<std::string> g_fileEndings = {
 	".exe"
 };
 
-
-inline uintptr_t AddressParser::parseLibrary(const char* str)
-{
+inline uintptr_t addressParser::parseInput(const char* str) {
 	std::string expression(str);
 	uintptr_t rtn = 0;
 
@@ -46,15 +48,13 @@ inline uintptr_t AddressParser::parseLibrary(const char* str)
 
 	size_t iterator = 0;
 
-	for (std::string& curToken : tokens)
-	{
+	for (std::string& curToken : tokens) {
 		size_t startPos = curToken.find_first_not_of(' ');
 		if (startPos != std::string::npos) {
 			curToken.erase(0, startPos);
 
 			size_t endPos = curToken.find_last_not_of(' ');
-			while (endPos + 1 < curToken.length())
-			{
+			while (endPos + 1 < curToken.length()) {
 				curToken.pop_back();
 			}
 		}
@@ -64,22 +64,27 @@ inline uintptr_t AddressParser::parseLibrary(const char* str)
 
 		uintptr_t value = 0;
 
-		bool isDll = false;
+		bool isModule = false;
 
-		for (const std::string& ending : g_fileEndings)
-		{
-			if (curToken.find(ending) != std::string::npos)
-			{
-				value = 0x10000;
-				isDll = true;
+		for (const std::string& ending : g_fileEndings) {
+			if (curToken.find(ending) != std::string::npos) {
+				std::wstring token(curToken.begin(), curToken.end());
+				moduleInfo info;
+				if (mem::getModuleInfo(mem::pid, token.c_str(), &info)) {
+					value = info.base;
+					isModule = true;
+				}
 				break; // break out of file endings loop, continue in main
 			}
 		}
 
-		if (!isDll)
-		{
-			value = std::stoull(curToken, nullptr, 16);
-			// assumes all inputs will be hexadecimal, maybe change later
+		if (!isModule) {
+			if (ui::isValidHex(curToken)) {
+				value = ui::toAddress(curToken);
+			}
+			else {
+				value = 0;
+			}
 		}
 
 		if (iterator == 0) {

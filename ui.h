@@ -79,7 +79,7 @@ void ui::renderMain() {
         ImGui::BeginChild("MemoryViewChild", ImVec2(wndSize.x - columnOffset - 16, wndSize.y - 54), 1);
         ImGui::SetNextItemWidth(150);
         if (ImGui::InputText("Address", addressInput, sizeof(addressInput), ImGuiInputTextFlags_EnterReturnsTrue)) {
-            uintptr_t newAddress = toAddress(addressInput);
+            uintptr_t newAddress = addressParser::parseInput(addressInput);
             updateAddress(newAddress, &sClass.address);
         }
 
