@@ -38,6 +38,7 @@ int nameCounter = 0;
 class uClass {
 public:
 	char name[64];
+	char addressInput[256];
 	std::vector<nodeBase> nodes;
 	uintptr_t address = 0;
 
@@ -47,6 +48,8 @@ public:
 			nodes.push_back(node);
 		}
 		memset(name, 0, sizeof(name));
+		memset(addressInput, 0, sizeof(addressInput));
+		addressInput[0] = '0';
 
 		std::string newName = "Class_" + std::to_string(nameCounter++);
 		memcpy(name, newName.data(), newName.size());

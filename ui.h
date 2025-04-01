@@ -10,7 +10,7 @@
 namespace ui {
     bool open = true;
     bool processWindow = false;
-    char addressInput[17] = "0";
+    char addressInput[256] = "0";
 
     ImVec2 mainPos;
 
@@ -23,6 +23,12 @@ namespace ui {
     std::string toHexString(uintptr_t address, int width = 0);
     bool isValidHex(std::string& str);
     void updateAddress(uintptr_t newAddress, uintptr_t* dest = 0);
+    void updateAddressBox(char* dest, char* src);
+}
+
+void ui::updateAddressBox(char* dest, char* src) {
+    memset(dest, 0, sizeof(addressInput));
+    memcpy(dest, src, strlen(src));
 }
 
 void ui::updateAddress(uintptr_t newAddress, uintptr_t* dest) {
@@ -31,10 +37,6 @@ void ui::updateAddress(uintptr_t newAddress, uintptr_t* dest) {
             *dest = newAddress;
         }
     }
-    
-    std::string hexString = toHexString(dest ? *dest : newAddress);
-    memset(addressInput, 0, sizeof(addressInput));
-    memcpy(addressInput, hexString.data(), hexString.size());
 }
 
 void ui::renderMain() {
@@ -68,6 +70,7 @@ void ui::renderMain() {
             if (ImGui::Selectable(lClass.name, (i == selectedClass))) {
                 selectedClass = i;
                 updateAddress(lClass.address);
+                updateAddressBox(addressInput, lClass.addressInput);
             }
         }
         ImGui::EndChild();
@@ -81,6 +84,7 @@ void ui::renderMain() {
         if (ImGui::InputText("Address", addressInput, sizeof(addressInput), ImGuiInputTextFlags_EnterReturnsTrue)) {
             uintptr_t newAddress = addressParser::parseInput(addressInput);
             updateAddress(newAddress, &sClass.address);
+            updateAddressBox(sClass.addressInput, addressInput);
         }
 
         static bool oInputFocused = false;
@@ -93,6 +97,7 @@ void ui::renderMain() {
         bool inputFocused = (GImGui->ActiveId == id);
         if (oInputFocused && !inputFocused) {
             updateAddress(sClass.address);
+            updateAddressBox(addressInput, sClass.addressInput);
         }
 
         oInputFocused = inputFocused;
