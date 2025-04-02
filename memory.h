@@ -22,6 +22,11 @@ struct moduleInfo {
     std::string name;
 };
 
+struct pointerInfo {
+    char section[8] = { 0 };
+    std::string moduleName;
+};
+
 namespace mem {
     std::vector<processSnapshot> processes;
     HANDLE memHandle;
@@ -33,11 +38,36 @@ namespace mem {
     bool getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info);
     void getModules();
     void getSections(moduleInfo& info, std::vector<moduleSection>& dest);
+    bool isPointer(uintptr_t address, pointerInfo* info);
 
     bool read(uintptr_t address, void* buf, uintptr_t size);
     bool write(uintptr_t address, const void* buf, uintptr_t size);
     bool initProcess(const wchar_t* processName);
     bool initProcess(DWORD pid);
+}
+
+bool mem::isPointer(uintptr_t address, pointerInfo* info) {
+    for (int i = 0; i < moduleList.size(); i++) {
+        auto& module = moduleList[i];
+        if (module.base <= address && address <= module.base + module.size) {
+            info->moduleName = module.name;
+            for (int j = 0; j < module.sections.size(); j++) {
+                auto& section = module.sections[j];
+                if (section.base <= address && address < section.base + section.size) {
+                    memcpy(info->section, section.name, 8);
+                    break;
+                }
+            }
+            return true;
+        }
+    }
+
+    MEMORY_BASIC_INFORMATION mbi;
+    if (VirtualQueryEx(memHandle, (LPCVOID)address, &mbi, sizeof(mbi))) {
+        return (mbi.Type == MEM_PRIVATE && mbi.State == MEM_COMMIT);
+    }
+
+    return false;
 }
 
 bool mem::getProcessList() {
@@ -111,8 +141,9 @@ void mem::getSections(moduleInfo& info, std::vector<moduleSection>& dest) {
         auto section = sectionHeader[i];
         moduleSection sectionInfo;
         sectionInfo.base = info.base + section.VirtualAddress;
-        sectionInfo.size = info.size + section.Misc.VirtualSize;
+        sectionInfo.size = section.Misc.VirtualSize;
         memcpy(sectionInfo.name, section.Name, 8);
+        dest.push_back(sectionInfo);
     }
 }
 

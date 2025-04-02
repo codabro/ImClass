@@ -171,11 +171,27 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 	pad += 15;
 
+	ImColor color = ImColor(255, 162, 0);
+
 	std::string numText = ui::toHexString(num, 0);
 
+	std::string toDraw = ("0x" + numText);
+
+	pointerInfo info;
+	if (mem::isPointer(num, &info)) {
+		color = ImColor(255, 0, 0);
+
+		if (info.moduleName == "") {
+			toDraw = "[heap] " + toDraw;
+		}
+		else {
+			toDraw = std::format("[{}] {} {}", info.section, info.moduleName.c_str(), toDraw.c_str());
+		}
+	}
+
 	ImGui::SetCursorPos(ImVec2(455 + pad, 10 + 12 * i));
-	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 162, 0).Value);
-	ImGui::Text(("0x" + numText).c_str());
+	ImGui::PushStyleColor(ImGuiCol_Text, color.Value);
+	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
 	if (ImGui::BeginPopupContextItem(("copyhex_" + std::to_string(i)).c_str())) {
 		if (ImGui::Selectable("Copy value")) {
