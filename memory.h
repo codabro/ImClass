@@ -27,6 +27,28 @@ struct pointerInfo {
     std::string moduleName;
 };
 
+struct RTTICompleteObjectLocator {
+    int signature;
+    int offset;
+    int cdOffset;
+    DWORD typeDescriptorOffset;
+    DWORD hierarchyDescriptorOffset;
+    DWORD selfOffset;
+};
+
+typedef const struct RTTIClassHierarchyDescriptor {
+    DWORD signature;
+    DWORD attributes;
+    DWORD numBaseClasses;
+    DWORD pBaseClassArray;
+};
+
+struct TypeDescriptor {
+    uintptr_t pVFTable;
+    uintptr_t spare;
+    char name[60];
+};
+
 namespace mem {
     std::vector<processSnapshot> processes;
     HANDLE memHandle;
@@ -39,11 +61,44 @@ namespace mem {
     void getModules();
     void getSections(moduleInfo& info, std::vector<moduleSection>& dest);
     bool isPointer(uintptr_t address, pointerInfo* info);
+    bool rttiInfo(uintptr_t address, std::string& out);
 
     bool read(uintptr_t address, void* buf, uintptr_t size);
     bool write(uintptr_t address, const void* buf, uintptr_t size);
     bool initProcess(const wchar_t* processName);
     bool initProcess(DWORD pid);
+}
+
+template <typename T>
+T Read(uintptr_t address);
+bool mem::rttiInfo(uintptr_t address, std::string& out) {
+    uintptr_t objectLocatorPtr = Read<uintptr_t>(address - sizeof(void*));
+    if (!objectLocatorPtr) {
+        return false;
+    }
+
+    auto objectLocator = Read<RTTICompleteObjectLocator>(objectLocatorPtr);
+    auto baseModule = objectLocatorPtr - objectLocator.selfOffset;
+
+    auto hierarchy = Read<RTTIClassHierarchyDescriptor>(baseModule + objectLocator.hierarchyDescriptorOffset);
+    uintptr_t classArray = baseModule + hierarchy.pBaseClassArray;
+
+    for (int i = 0; i < hierarchy.numBaseClasses; i++) {
+        uintptr_t classDescriptor = baseModule + Read<DWORD>(classArray + i * sizeof(DWORD));
+        DWORD typeDescriptorOffset = Read<DWORD>(classDescriptor);
+        auto typeDescriptor = Read<TypeDescriptor>(baseModule + typeDescriptorOffset);
+
+        std::string name = typeDescriptor.name;
+        if (!name.ends_with("@@")) {
+            return false;
+        }
+
+        name = name.substr(4);
+        name = name.substr(0, name.size() - 2);
+
+        out = out + " : " + name;
+    }
+    return true;
 }
 
 bool mem::isPointer(uintptr_t address, pointerInfo* info) {

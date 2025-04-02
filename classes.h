@@ -187,6 +187,11 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 		else {
 			toDraw = std::format("[{}] {} {}", info.section, info.moduleName.c_str(), toDraw.c_str());
 		}
+
+		std::string rttiNames;
+		if (mem::rttiInfo(num, rttiNames)) {
+			toDraw += rttiNames;
+		}
 	}
 
 	ImGui::SetCursorPos(ImVec2(455 + pad, 10 + 12 * i));
