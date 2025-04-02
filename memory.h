@@ -9,19 +9,31 @@ struct processSnapshot {
     DWORD pid;
 };
 
+struct moduleSection {
+    uintptr_t base;
+    DWORD size;
+    char name[8];
+};
+
 struct moduleInfo {
     uintptr_t base;
     DWORD size;
+    std::vector<moduleSection> sections;
+    std::string name;
 };
 
 namespace mem {
     std::vector<processSnapshot> processes;
     HANDLE memHandle;
     DWORD pid;
+    std::vector<moduleInfo> moduleList;
 
     bool getProcessList();
     HANDLE openHandle(DWORD pid);
     bool getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info);
+    void getModules();
+    void getSections(moduleInfo& info, std::vector<moduleSection>& dest);
+
     bool read(uintptr_t address, void* buf, uintptr_t size);
     bool write(uintptr_t address, const void* buf, uintptr_t size);
     bool initProcess(const wchar_t* processName);
@@ -56,6 +68,52 @@ bool mem::getProcessList() {
 
     CloseHandle(hSnapshot);
     return true;
+}
+
+void mem::getModules() {
+    moduleList.clear();
+
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    MODULEENTRY32W entry = {};
+    entry.dwSize = sizeof(MODULEENTRY32W);
+
+    if (Module32FirstW(snapshot, &entry)) {
+        do {
+            std::wstring entryName = entry.szModule;
+            moduleInfo info;
+            info.name = std::string(entryName.begin(), entryName.end());
+            info.base = (uintptr_t)entry.modBaseAddr;
+            info.size = entry.modBaseSize;
+            getSections(info, info.sections);
+
+            moduleList.push_back(info);
+        } while (Module32NextW(snapshot, &entry));
+    }
+
+    CloseHandle(snapshot);
+
+    return;
+}
+
+void mem::getSections(moduleInfo& info, std::vector<moduleSection>& dest) {
+    BYTE buf[4096];
+    read(info.base, buf, sizeof(buf));
+
+    auto dosHeader = (IMAGE_DOS_HEADER*)buf;
+    auto ntHeader = (IMAGE_NT_HEADERS*)(buf + dosHeader->e_lfanew);
+    auto sectionHeader = IMAGE_FIRST_SECTION(ntHeader);
+
+    for (int i = 0; i < ntHeader->FileHeader.NumberOfSections; i++) {
+        auto section = sectionHeader[i];
+        moduleSection sectionInfo;
+        sectionInfo.base = info.base + section.VirtualAddress;
+        sectionInfo.size = info.size + section.Misc.VirtualSize;
+        memcpy(sectionInfo.name, section.Name, 8);
+    }
 }
 
 bool mem::getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info) {
@@ -105,6 +163,7 @@ bool mem::initProcess(const wchar_t* processName) {
     for (auto& proc : processes) {
         if (!wcscmp(proc.name.c_str(), processName)) {
             if (openHandle(proc.pid)) {
+                getModules();
                 return true;
             }
         }
@@ -115,7 +174,10 @@ bool mem::initProcess(const wchar_t* processName) {
 
 bool mem::initProcess(DWORD pid) {
     mem::pid = pid;
-    return openHandle(pid);
+    if (openHandle(pid)) {
+        getModules();
+        return true;
+    }
 }
 
 template <typename T>
