@@ -118,6 +118,13 @@ void uClass::drawInteger(int i, int64_t value, nodeType type) {
 
 	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + nameSize.x + 30, y));
 	ImGui::Text("=  %lld", value);
+
+	if (ImGui::BeginPopupContextItem(("copyintvar_" + std::to_string(i)).c_str())) {
+		if (ImGui::Selectable("Copy value")) {
+			ImGui::SetClipboardText(std::to_string(value).c_str());
+		}
+		ImGui::EndPopup();
+	}
 }
 
 void uClass::changeType(nodeType newType) {
@@ -164,10 +171,18 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 	pad += 15;
 
+	std::string numText = ui::toHexString(num, 0);
+
 	ImGui::SetCursorPos(ImVec2(455 + pad, 10 + 12 * i));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 162, 0).Value);
-	ImGui::Text(("0x" + ui::toHexString(num, 0)).c_str());
+	ImGui::Text(("0x" + numText).c_str());
 	ImGui::PopStyleColor();
+	if (ImGui::BeginPopupContextItem(("copyhex_" + std::to_string(i)).c_str())) {
+		if (ImGui::Selectable("Copy value")) {
+			ImGui::SetClipboardText(numText.c_str());
+		}
+		ImGui::EndPopup();
+	}
 }
 
 void uClass::drawDouble(int i, double num, int* pad) {
@@ -184,6 +199,13 @@ void uClass::drawDouble(int i, double num, int* pad) {
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
+
+	if (ImGui::BeginPopupContextItem(("copydouble_" + std::to_string(i)).c_str())) {
+		if (ImGui::Selectable("Copy value")) {
+			ImGui::SetClipboardText(toDraw.c_str());
+		}
+		ImGui::EndPopup();
+	}
 }
 
 void uClass::drawFloat(int i, float num, int* pad) {
@@ -200,6 +222,13 @@ void uClass::drawFloat(int i, float num, int* pad) {
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
+
+	if (ImGui::BeginPopupContextItem(("copyfloat_" + std::to_string(i)).c_str())) {
+		if (ImGui::Selectable("Copy value")) {
+			ImGui::SetClipboardText(toDraw.c_str());
+		}
+		ImGui::EndPopup();
+	}
 }
 
 void uClass::drawNumber(int i, uintptr_t num, int* pad) {
@@ -213,6 +242,13 @@ void uClass::drawNumber(int i, uintptr_t num, int* pad) {
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 218, 133).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
+
+	if (ImGui::BeginPopupContextItem(("copyint_" + std::to_string(i)).c_str())) {
+		if (ImGui::Selectable("Copy value")) {
+			ImGui::SetClipboardText(toDraw.c_str());
+		}
+		ImGui::EndPopup();
+	}
 
 	*pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 }
