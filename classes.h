@@ -70,11 +70,16 @@ public:
 	std::vector<nodeBase> nodes;
 	uintptr_t address = 0;
 	int varCounter = 0;
+	size_t size;
+	BYTE* data = 0;
 
-	uClass() {
-		for (int i = 0; i < 50; i++) {
+	uClass(int nodeCount) {
+		size = 0;
+
+		for (int i = 0; i < nodeCount; i++) {
 			nodeBase node = {0, node_hex64};
 			nodes.push_back(node);
+			size += 8;
 		}
 		memset(name, 0, sizeof(name));
 		memset(addressInput, 0, sizeof(addressInput));
@@ -82,9 +87,13 @@ public:
 
 		std::string newName = "Class_" + std::to_string(nameCounter++);
 		memcpy(name, newName.data(), newName.size());
+
+		data = (BYTE*)malloc(size);
+		memset(data, 0, size);
 	}
 
-	void drawNodes(BYTE* data, int len);
+	void readData();
+	void drawNodes();
 	void drawStringBytes(int i, BYTE* data, int pos, int size);
 	void drawOffset(int i, int pos);
 	void drawAddress(int i, int pos);
@@ -99,6 +108,10 @@ public:
 
 	void drawInteger(int i, int64_t value, nodeType type);
 };
+
+void uClass::readData() {
+
+}
 
 void uClass::drawInteger(int i, int64_t value, nodeType type) {
 	int y = 10 + 12 * i;
@@ -178,7 +191,8 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 	std::string toDraw = ("0x" + numText);
 
 	pointerInfo info;
-	if (mem::isPointer(num, &info)) {
+	bool isPointer = mem::isPointer(num, &info);
+	if (isPointer) {
 		color = ImColor(255, 0, 0);
 
 		if (info.moduleName == "") {
@@ -205,6 +219,17 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 			ImGui::SetClipboardText(numText.c_str());
 		}
 		ImGui::EndPopup();
+	}
+
+	if (isPointer) {
+		if (ImGui::BeginItemTooltip()) {
+			ImGui::BeginChild("MemPreview_Child");
+			uClass previewClass(15);
+			previewClass.address = num;
+			previewClass.drawNodes();
+			ImGui::EndChild();
+			ImGui::EndTooltip();
+		}
 	}
 
 	auto buf = Read<readBuf<64>>(num);
@@ -427,7 +452,9 @@ void uClass::drawControllers(int i, int counter) {
 	}
 }
 
-void uClass::drawNodes(BYTE* data, int len) {
+void uClass::drawNodes() {
+	mem::read(this->address, this->data, this->size);
+
 	size_t counter = 0;
 	for (int i = 0; i < nodes.size(); i++) {
 		auto& node = nodes[i];
@@ -510,4 +537,4 @@ void uClass::drawNodes(BYTE* data, int len) {
 	}
 }
 
-std::vector<uClass> g_Classes = { uClass{}, uClass{}, uClass{} };
+std::vector<uClass> g_Classes = { uClass(30), uClass(30), uClass(30) };
