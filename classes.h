@@ -194,6 +194,8 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 		}
 	}
 
+	ImVec2 textSize = ImGui::CalcTextSize(toDraw.c_str());
+
 	ImGui::SetCursorPos(ImVec2(455 + pad, 10 + 12 * i));
 	ImGui::PushStyleColor(ImGuiCol_Text, color.Value);
 	ImGui::Text(toDraw.c_str());
@@ -203,6 +205,24 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 			ImGui::SetClipboardText(numText.c_str());
 		}
 		ImGui::EndPopup();
+	}
+
+	auto buf = Read<readBuf<64>>(num);
+	bool isString = true;
+	for (int i = 0; i < 4; i++) {
+		if (buf.data[i] < 21 || buf.data[i] > 126) {
+			isString = false;
+			break;
+		}
+	}
+
+	std::string stringDraw = std::format("'{}'", (char*)buf.data);
+
+	if (isString) {
+		ImGui::SetCursorPos(ImVec2(455 + pad + textSize.x + 15, 10 + 12 * i));
+		ImGui::PushStyleColor(ImGuiCol_Text, ImColor(3, 252, 140).Value);
+		ImGui::Text(stringDraw.c_str());
+		ImGui::PopStyleColor();
 	}
 }
 

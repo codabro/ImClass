@@ -98,6 +98,7 @@ bool mem::rttiInfo(uintptr_t address, std::string& out) {
 
         out = out + " : " + name;
     }
+
     return true;
 }
 
