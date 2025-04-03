@@ -42,6 +42,10 @@ char typeNames[][21] = {
 	"Int64"
 };
 
+bool g_HoveringPointer = false;
+class uClass;
+uClass* g_PreviewClass = 0;
+
 class nodeBase {
 public:
 	char name[64];
@@ -89,10 +93,16 @@ public:
 		memcpy(name, newName.data(), newName.size());
 
 		data = (BYTE*)malloc(size);
-		memset(data, 0, size);
+
+		if (data) {
+			memset(data, 0, size);
+		}
+		else {
+			MessageBoxA(0, "Failed to allocate memory!", "ERROR", MB_ICONERROR);
+		}
 	}
 
-	void readData();
+	void resize(int size);
 	void drawNodes();
 	void drawStringBytes(int i, BYTE* data, int pos, int size);
 	void drawOffset(int i, int pos);
@@ -109,8 +119,47 @@ public:
 	void drawInteger(int i, int64_t value, nodeType type);
 };
 
-void uClass::readData() {
+void uClass::resize(int mod) {
+	assert(mod > 0 || mod == -8); // not intended
 
+	int newSize = size + mod;
+	if (newSize < 1) {
+		return;
+	}
+
+	auto newData = (BYTE*)realloc(data, newSize);
+	if (!newData) {
+		MessageBoxA(0, "Failed to reallocate memory!", "ERROR", MB_ICONERROR);
+	}
+	else {
+		data = newData;
+		size = newSize;
+
+		if (mod < 0) {
+			nodes.erase(nodes.begin() + nodes.size() - 1);
+		}
+		else {
+			int remaining = mod;
+			while (remaining > 0) {
+				if (remaining >= 8) {
+					remaining = remaining % 8;
+					nodes.push_back({ 0, node_hex64, false });
+				}
+				else if (remaining >= 4) {
+					remaining = remaining % 4;
+					nodes.push_back({ 0, node_hex32, false });
+				}
+				else if (remaining >= 2) {
+					remaining = remaining % 2;
+					nodes.push_back({ 0, node_hex16, false });
+				}
+				else if (remaining >= 1) {
+					remaining = remaining - 1;
+					nodes.push_back({ 0, node_hex8, false });
+				}
+			}
+		}
+	}
 }
 
 void uClass::drawInteger(int i, int64_t value, nodeType type) {
@@ -222,11 +271,29 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 	}
 
 	if (isPointer) {
+		ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
+		if (ImGui::IsItemHovered()) {
+			g_HoveringPointer = true;
+		}
+
 		if (ImGui::BeginItemTooltip()) {
-			ImGui::BeginChild("MemPreview_Child");
-			uClass previewClass(15);
-			previewClass.address = num;
-			previewClass.drawNodes();
+			ImGui::BeginChild("MemPreview_Child", ImVec2(0, 0), ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
+			if (!g_PreviewClass) {
+				g_PreviewClass = new uClass(15);
+
+			}
+
+			float mWheel = ImGui::GetIO().MouseWheel;
+			if (mWheel > 0) {
+				g_PreviewClass->resize(-8);
+			}
+			else if (mWheel < 0) {
+				g_PreviewClass->resize(8);
+			}
+
+			g_PreviewClass->address = num;
+			g_PreviewClass->drawNodes();
+
 			ImGui::EndChild();
 			ImGui::EndTooltip();
 		}
@@ -454,7 +521,7 @@ void uClass::drawControllers(int i, int counter) {
 
 void uClass::drawNodes() {
 	mem::read(this->address, this->data, this->size);
-
+	
 	size_t counter = 0;
 	for (int i = 0; i < nodes.size(); i++) {
 		auto& node = nodes[i];
@@ -535,6 +602,14 @@ void uClass::drawNodes() {
 			break;
 		}
 	}
+
+	if (!g_HoveringPointer) {
+		if (g_PreviewClass) {
+			free(g_PreviewClass->data);
+			delete g_PreviewClass;
+			g_PreviewClass = 0;
+		}
+	}
 }
 
-std::vector<uClass> g_Classes = { uClass(30), uClass(30), uClass(30) };
+std::vector<uClass> g_Classes = { uClass(50), uClass(50), uClass(50) };
