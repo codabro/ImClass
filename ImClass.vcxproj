@@ -169,6 +169,7 @@
     <ClInclude Include="include\imgui\imstb_truetype.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="memory.h" />
+    <ClInclude Include="patterns.h" />
     <ClInclude Include="ui.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

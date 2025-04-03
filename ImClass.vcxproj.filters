@@ -80,5 +80,8 @@
     <ClInclude Include="parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="patterns.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

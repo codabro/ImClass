@@ -7,6 +7,8 @@
 #include <regex>
 #include <imgui/imgui_internal.h>
 
+#include "patterns.h"
+
 namespace ui {
     bool open = true;
     bool processWindow = false;
@@ -50,7 +52,11 @@ void ui::renderMain() {
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Sigma")) {
+        if (ImGui::BeginMenu("Tools")) {
+            if (ImGui::Button("sig scan"))
+            {
+                testPatternScanning();
+            }
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();
