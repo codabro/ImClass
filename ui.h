@@ -102,9 +102,10 @@ void ui::renderMain() {
 
         oInputFocused = inputFocused;
 
-        ImGui::BeginChild("MemView");
-        auto buf = Read<readBuf<4096>>(sClass.address);
-        sClass.drawNodes(buf.data, 4096);
+        ImGui::BeginChild("MemView", ImVec2(0, 0), 0, g_HoveringPointer? ImGuiWindowFlags_NoScrollWithMouse : 0);
+        g_HoveringPointer = false;
+        //auto buf = Read<readBuf<4096>>(sClass.address);
+        sClass.drawNodes();
         ImGui::EndChild();
 
         ImGui::EndChild();
