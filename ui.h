@@ -12,6 +12,8 @@
 namespace ui {
     bool open = true;
     bool processWindow = false;
+    bool signaturePopup = false;
+    inline std::optional<PatternScanResult> patternResults;
     char addressInput[256] = "0";
 
     ImVec2 mainPos;
@@ -25,12 +27,30 @@ namespace ui {
     std::string toHexString(uintptr_t address, int width = 0);
     bool isValidHex(std::string& str);
     void updateAddress(uintptr_t newAddress, uintptr_t* dest = 0);
+    void displaySignatures();
     void updateAddressBox(char* dest, char* src);
 }
 
 void ui::updateAddressBox(char* dest, char* src) {
     memset(dest, 0, sizeof(addressInput));
     memcpy(dest, src, strlen(src));
+}
+
+void ui::displaySignatures() {
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Signatures", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("placeholder");
+
+        if (ImGui::Button("Close"))
+            ImGui::CloseCurrentPopup();
+
+        ImGui::EndPopup();
+    }
+
+
 }
 
 void ui::updateAddress(uintptr_t newAddress, uintptr_t* dest) {
@@ -53,9 +73,19 @@ void ui::renderMain() {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Tools")) {
+            static char module[512] = { 0 };
+            static char signature[512] = { 0 };
+            ImGui::InputText("module", module, sizeof(module));
+			ImGui::InputText("signature", signature, sizeof(signature));
             if (ImGui::Button("sig scan"))
             {
-                testPatternScanning();
+                PatternInfo pattern;
+				pattern.pattern = signature;
+                patternResults = pattern::scanPattern(pattern, module);
+				if (patternResults != std::nullopt && !patternResults.value().matches.empty()) {
+                    ImGui::OpenPopup("Signatures");
+				}
+
             }
             ImGui::EndMenu();
         }
@@ -92,6 +122,8 @@ void ui::renderMain() {
             updateAddress(newAddress, &sClass.address);
             updateAddressBox(sClass.addressInput, addressInput);
         }
+
+        ui::displaySignatures();
 
         static bool oInputFocused = false;
 
