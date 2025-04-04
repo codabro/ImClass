@@ -102,6 +102,7 @@ public:
 		}
 	}
 
+	void sizeToNodes();
 	void resize(int size);
 	void drawNodes();
 	void drawStringBytes(int i, BYTE* data, int pos, int size);
@@ -119,6 +120,21 @@ public:
 	void drawInteger(int i, int64_t value, nodeType type);
 };
 
+void uClass::sizeToNodes() {
+	size_t szNodes = 0;
+	for (auto& node : nodes) {
+		szNodes += node.size;
+	}
+
+	auto newData = (BYTE*)realloc(data, szNodes);
+	if (!newData) {
+		MessageBoxA(0, "Failed to reallocate memory!", "ERROR", MB_ICONERROR);
+		return;
+	}
+
+	data = newData;
+}
+
 void uClass::resize(int mod) {
 	assert(mod > 0 || mod == -8); // not intended
 
@@ -130,33 +146,34 @@ void uClass::resize(int mod) {
 	auto newData = (BYTE*)realloc(data, newSize);
 	if (!newData) {
 		MessageBoxA(0, "Failed to reallocate memory!", "ERROR", MB_ICONERROR);
+		return;
+	}
+
+	data = newData;
+	size = newSize;
+
+	if (mod < 0) {
+		nodes.erase(nodes.begin() + nodes.size() - 1);
+		sizeToNodes();
 	}
 	else {
-		data = newData;
-		size = newSize;
-
-		if (mod < 0) {
-			nodes.erase(nodes.begin() + nodes.size() - 1);
-		}
-		else {
-			int remaining = mod;
-			while (remaining > 0) {
-				if (remaining >= 8) {
-					remaining = remaining % 8;
-					nodes.push_back({ 0, node_hex64, false });
-				}
-				else if (remaining >= 4) {
-					remaining = remaining % 4;
-					nodes.push_back({ 0, node_hex32, false });
-				}
-				else if (remaining >= 2) {
-					remaining = remaining % 2;
-					nodes.push_back({ 0, node_hex16, false });
-				}
-				else if (remaining >= 1) {
-					remaining = remaining - 1;
-					nodes.push_back({ 0, node_hex8, false });
-				}
+		int remaining = mod;
+		while (remaining > 0) {
+			if (remaining >= 8) {
+				remaining = remaining % 8;
+				nodes.push_back({ 0, node_hex64, false });
+			}
+			else if (remaining >= 4) {
+				remaining = remaining % 4;
+				nodes.push_back({ 0, node_hex32, false });
+			}
+			else if (remaining >= 2) {
+				remaining = remaining % 2;
+				nodes.push_back({ 0, node_hex16, false });
+			}
+			else if (remaining >= 1) {
+				remaining = remaining - 1;
+				nodes.push_back({ 0, node_hex8, false });
 			}
 		}
 	}
@@ -224,6 +241,8 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex8, selectNew });
 		}
 	}
+
+	sizeToNodes();
 
 	if (newNodes) {
 		*newNodes = inserted - 1;
