@@ -133,6 +133,7 @@ void uClass::sizeToNodes() {
 	}
 
 	data = newData;
+	size = szNodes;
 }
 
 void uClass::resize(int mod) {
@@ -559,85 +560,94 @@ void uClass::drawControllers(int i, int counter) {
 void uClass::drawNodes() {
 	mem::read(this->address, this->data, this->size);
 	
-	size_t counter = 0;
-	for (int i = 0; i < nodes.size(); i++) {
-		auto& node = nodes[i];
+	ImGuiListClipper clipper;
+	clipper.Begin(nodes.size(), 12.0f);
+		while (clipper.Step()) {
+			size_t counter = 0;
+			for (int i = 0; i < clipper.DisplayStart; i++) {
+				auto& node = nodes[i];
+				counter += node.size;
+			}
 
-		drawControllers(i, counter);
-		drawOffset(i, counter);
-		drawAddress(i, counter);
+			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+				auto& node = nodes[i];
 
-		size_t lCounter = 0;
-		uintptr_t num = 0;
-		float floatNum;
-		double doubleNum;
-		int pad = 0;
+				drawControllers(i, counter);
+				drawOffset(i, counter);
+				drawAddress(i, counter);
 
-		// this kinda sucks
-		switch (node.type) {
-		case node_hex8:
-			drawStringBytes(i, data, counter, 1);
-			drawBytes(i, data, counter, 1);
+				size_t lCounter = 0;
+				uintptr_t num = 0;
+				float floatNum;
+				double doubleNum;
+				int pad = 0;
 
-			num = *(uint8_t*)((uintptr_t)data + counter);
-			drawNumber(i, num, &pad);
-			drawHexNumber(i, num, pad);
+				// this kinda sucks
+				switch (node.type) {
+				case node_hex8:
+					drawStringBytes(i, data, counter, 1);
+					drawBytes(i, data, counter, 1);
 
-			counter += 1;
-			break;
-		case node_hex16:
-			drawStringBytes(i, data, counter, 2);
-			drawBytes(i, data, counter, 2);
+					num = *(uint8_t*)((uintptr_t)data + counter);
+					drawNumber(i, num, &pad);
+					drawHexNumber(i, num, pad);
 
-			num = *(uint16_t*)((uintptr_t)data + counter);
-			drawNumber(i, num, &pad);
-			drawHexNumber(i, num, pad);
+					counter += 1;
+					break;
+				case node_hex16:
+					drawStringBytes(i, data, counter, 2);
+					drawBytes(i, data, counter, 2);
 
-			counter += 2;
-			break;
-		case node_hex32:
-			drawStringBytes(i, data, counter, 4);
-			drawBytes(i, data, counter, 4);
+					num = *(uint16_t*)((uintptr_t)data + counter);
+					drawNumber(i, num, &pad);
+					drawHexNumber(i, num, pad);
 
-			floatNum = *(float*)((uintptr_t)data + counter);
-			drawFloat(i, floatNum, &pad);
+					counter += 2;
+					break;
+				case node_hex32:
+					drawStringBytes(i, data, counter, 4);
+					drawBytes(i, data, counter, 4);
 
-			num = *(uint32_t*)((uintptr_t)data + counter);
-			drawNumber(i, num, &pad);
-			drawHexNumber(i, num, pad);
+					floatNum = *(float*)((uintptr_t)data + counter);
+					drawFloat(i, floatNum, &pad);
 
-			counter += 4;
-			break;
-		case node_hex64:
-			drawStringBytes(i, data, counter, 8);
-			drawBytes(i, data, counter, 8);
+					num = *(uint32_t*)((uintptr_t)data + counter);
+					drawNumber(i, num, &pad);
+					drawHexNumber(i, num, pad);
 
-			doubleNum = *(double*)((uintptr_t)data + counter);
-			drawDouble(i, doubleNum, &pad);
+					counter += 4;
+					break;
+				case node_hex64:
+					drawStringBytes(i, data, counter, 8);
+					drawBytes(i, data, counter, 8);
 
-			num = *(uint64_t*)((uintptr_t)data + counter);
-			drawNumber(i, num, &pad);
-			drawHexNumber(i, num, pad);
+					doubleNum = *(double*)((uintptr_t)data + counter);
+					drawDouble(i, doubleNum, &pad);
 
-			counter += 8;
-			break;
-		case node_int64:
-			drawInteger(i, *(int64_t*)((uintptr_t)data + counter), node_int64);
-			counter += 8;
-			break;
-		case node_int32:
-			drawInteger(i, *(int32_t*)((uintptr_t)data + counter), node_int32);
-			counter += 4;
-			break;
-		case node_int16:
-			drawInteger(i, *(int16_t*)((uintptr_t)data + counter), node_int16);
-			counter += 2;
-			break;
-		case node_int8:
-			drawInteger(i, *(int8_t*)((uintptr_t)data + counter), node_int8);
-			counter += 1;
-			break;
-		}
+					num = *(uint64_t*)((uintptr_t)data + counter);
+					drawNumber(i, num, &pad);
+					drawHexNumber(i, num, pad);
+
+					counter += 8;
+					break;
+				case node_int64:
+					drawInteger(i, *(int64_t*)((uintptr_t)data + counter), node_int64);
+					counter += 8;
+					break;
+				case node_int32:
+					drawInteger(i, *(int32_t*)((uintptr_t)data + counter), node_int32);
+					counter += 4;
+					break;
+				case node_int16:
+					drawInteger(i, *(int16_t*)((uintptr_t)data + counter), node_int16);
+					counter += 2;
+					break;
+				case node_int8:
+					drawInteger(i, *(int8_t*)((uintptr_t)data + counter), node_int8);
+					counter += 1;
+					break;
+				}
+			}
 	}
 
 	if (!g_HoveringPointer) {
