@@ -229,11 +229,11 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 	int sizeDiff = oldSize - typeSize;
 	while (sizeDiff > 0) {
 		if (sizeDiff >= 4) {
-			sizeDiff = sizeDiff % 4;
+			sizeDiff = sizeDiff - 4;
 			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex32, selectNew });
 		}
 		else if (sizeDiff >= 2) {
-			sizeDiff = sizeDiff % 2;
+			sizeDiff = sizeDiff - 2;
 			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex16, selectNew });
 		}
 		else if (sizeDiff >= 1) {
