@@ -81,9 +81,9 @@ public:
 		size = 0;
 
 		for (int i = 0; i < nodeCount; i++) {
-			nodeBase node = {0, node_hex64};
+			nodeBase node = {0, mem::x32 ? node_hex32 : node_hex64};
 			nodes.push_back(node);
-			size += 8;
+			size += typeSizes[node.type];
 		}
 		memset(name, 0, sizeof(name));
 		memset(addressInput, 0, sizeof(addressInput));
@@ -613,3 +613,10 @@ void uClass::drawNodes() {
 }
 
 std::vector<uClass> g_Classes = { uClass(50), uClass(50), uClass(50) };
+
+void initClasses(bool isX32) {
+	if (g_Classes.empty() || isX32 != mem::x32) {
+		mem::x32 = isX32;
+		g_Classes = { uClass(50), uClass(50), uClass(50) };
+	}
+}

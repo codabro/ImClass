@@ -54,6 +54,7 @@ namespace mem {
     HANDLE memHandle;
     DWORD pid;
     std::vector<moduleInfo> moduleList;
+    bool x32 = false;
 
     bool getProcessList();
     HANDLE openHandle(DWORD pid);
@@ -67,6 +68,16 @@ namespace mem {
     bool write(uintptr_t address, const void* buf, uintptr_t size);
     bool initProcess(const wchar_t* processName);
     bool initProcess(DWORD pid);
+    bool isX32(HANDLE handle);
+}
+
+bool mem::isX32(HANDLE handle) {
+    BOOL wow64 = FALSE;
+    if (!IsWow64Process(handle, &wow64)) {
+        return false;
+    }
+
+    return wow64;
 }
 
 template <typename T>
@@ -259,10 +270,13 @@ bool mem::initProcess(const wchar_t* processName) {
     return false;
 }
 
+extern void initClasses(bool);
 bool mem::initProcess(DWORD pid) {
     mem::pid = pid;
     if (openHandle(pid)) {
         getModules();
+        bool newX32 = isX32(memHandle);
+        initClasses(newX32);
         return true;
     }
 }

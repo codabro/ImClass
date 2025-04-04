@@ -64,6 +64,13 @@ void ui::renderMain() {
         ImVec2 wndSize = ImGui::GetWindowSize();
 
         ImGui::BeginChild("ClassesChild", ImVec2(columnOffset - 15, wndSize.y - 54), 1);
+
+        if (g_Classes.empty()) {
+            ImGui::EndChild();
+            ImGui::End();
+            return;
+        }
+
         static int selectedClass = 0;
         for (int i = 0; i < g_Classes.size(); i++) {
             auto& lClass = g_Classes[i];
