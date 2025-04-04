@@ -81,9 +81,9 @@ public:
 		size = 0;
 
 		for (int i = 0; i < nodeCount; i++) {
-			nodeBase node = {0, node_hex64};
+			nodeBase node = {0, mem::x32 ? node_hex32 : node_hex64};
 			nodes.push_back(node);
-			size += 8;
+			size += typeSizes[node.type];
 		}
 		memset(name, 0, sizeof(name));
 		memset(addressInput, 0, sizeof(addressInput));
@@ -102,6 +102,7 @@ public:
 		}
 	}
 
+	void sizeToNodes();
 	void resize(int size);
 	void drawNodes();
 	void drawStringBytes(int i, BYTE* data, int pos, int size);
@@ -119,6 +120,22 @@ public:
 	void drawInteger(int i, int64_t value, nodeType type);
 };
 
+void uClass::sizeToNodes() {
+	size_t szNodes = 0;
+	for (auto& node : nodes) {
+		szNodes += node.size;
+	}
+
+	auto newData = (BYTE*)realloc(data, szNodes);
+	if (!newData) {
+		MessageBoxA(0, "Failed to reallocate memory!", "ERROR", MB_ICONERROR);
+		return;
+	}
+
+	data = newData;
+	size = szNodes;
+}
+
 void uClass::resize(int mod) {
 	assert(mod > 0 || mod == -8); // not intended
 
@@ -127,38 +144,31 @@ void uClass::resize(int mod) {
 		return;
 	}
 
-	auto newData = (BYTE*)realloc(data, newSize);
-	if (!newData) {
-		MessageBoxA(0, "Failed to reallocate memory!", "ERROR", MB_ICONERROR);
+	if (mod < 0) {
+		nodes.erase(nodes.begin() + nodes.size() - 1);
+		sizeToNodes();
 	}
 	else {
-		data = newData;
-		size = newSize;
-
-		if (mod < 0) {
-			nodes.erase(nodes.begin() + nodes.size() - 1);
-		}
-		else {
-			int remaining = mod;
-			while (remaining > 0) {
-				if (remaining >= 8) {
-					remaining = remaining % 8;
-					nodes.push_back({ 0, node_hex64, false });
-				}
-				else if (remaining >= 4) {
-					remaining = remaining % 4;
-					nodes.push_back({ 0, node_hex32, false });
-				}
-				else if (remaining >= 2) {
-					remaining = remaining % 2;
-					nodes.push_back({ 0, node_hex16, false });
-				}
-				else if (remaining >= 1) {
-					remaining = remaining - 1;
-					nodes.push_back({ 0, node_hex8, false });
-				}
+		int remaining = mod;
+		while (remaining > 0) {
+			if (remaining >= 8) {
+				remaining = remaining - 8;
+				nodes.push_back({ 0, node_hex64, false });
+			}
+			else if (remaining >= 4) {
+				remaining = remaining - 4;
+				nodes.push_back({ 0, node_hex32, false });
+			}
+			else if (remaining >= 2) {
+				remaining = remaining - 2;
+				nodes.push_back({ 0, node_hex16, false });
+			}
+			else if (remaining >= 1) {
+				remaining = remaining - 1;
+				nodes.push_back({ 0, node_hex8, false });
 			}
 		}
+		sizeToNodes();
 	}
 }
 
@@ -212,11 +222,11 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 	int sizeDiff = oldSize - typeSize;
 	while (sizeDiff > 0) {
 		if (sizeDiff >= 4) {
-			sizeDiff = sizeDiff % 4;
+			sizeDiff = sizeDiff - 4;
 			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex32, selectNew });
 		}
 		else if (sizeDiff >= 2) {
-			sizeDiff = sizeDiff % 2;
+			sizeDiff = sizeDiff - 2;
 			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex16, selectNew });
 		}
 		else if (sizeDiff >= 1) {
@@ -224,6 +234,8 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex8, selectNew });
 		}
 	}
+
+	sizeToNodes();
 
 	if (newNodes) {
 		*newNodes = inserted - 1;
@@ -505,6 +517,32 @@ void uClass::drawControllers(int i, int counter) {
 
 			ImGui::EndMenu();
 		}
+
+		if (ImGui::BeginMenu("Add Bytes")) {
+			if (ImGui::Selectable("4 Bytes")) {
+				resize(4);
+			}
+			if (ImGui::Selectable("8 Bytes")) {
+				resize(8);
+			}
+			if (ImGui::Selectable("64 Bytes")) {
+				resize(64);
+			}
+			if (ImGui::Selectable("512 Bytes")) {
+				resize(512);
+			}
+			if (ImGui::Selectable("1024 Bytes")) {
+				resize(1024);
+			}
+			if (ImGui::Selectable("4096 Bytes")) {
+				resize(4096);
+			}
+			if (ImGui::Selectable("8192 Bytes")) {
+				resize(8192);
+			}
+			ImGui::EndMenu();
+		}
+
 		if (ImGui::Selectable("Delete")) {
 			for (int j = nodes.size() - 1; j >= 0; j--) {
 				if (nodes[j].selected) {
@@ -522,85 +560,94 @@ void uClass::drawControllers(int i, int counter) {
 void uClass::drawNodes() {
 	mem::read(this->address, this->data, this->size);
 	
-	size_t counter = 0;
-	for (int i = 0; i < nodes.size(); i++) {
-		auto& node = nodes[i];
+	ImGuiListClipper clipper;
+	clipper.Begin(nodes.size(), 12.0f);
+		while (clipper.Step()) {
+			size_t counter = 0;
+			for (int i = 0; i < clipper.DisplayStart; i++) {
+				auto& node = nodes[i];
+				counter += node.size;
+			}
 
-		drawControllers(i, counter);
-		drawOffset(i, counter);
-		drawAddress(i, counter);
+			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+				auto& node = nodes[i];
 
-		size_t lCounter = 0;
-		uintptr_t num = 0;
-		float floatNum;
-		double doubleNum;
-		int pad = 0;
+				drawControllers(i, counter);
+				drawOffset(i, counter);
+				drawAddress(i, counter);
 
-		// this kinda sucks
-		switch (node.type) {
-		case node_hex8:
-			drawStringBytes(i, data, counter, 1);
-			drawBytes(i, data, counter, 1);
+				size_t lCounter = 0;
+				uintptr_t num = 0;
+				float floatNum;
+				double doubleNum;
+				int pad = 0;
 
-			num = *(uint8_t*)((uintptr_t)data + counter);
-			drawNumber(i, num, &pad);
-			drawHexNumber(i, num, pad);
+				// this kinda sucks
+				switch (node.type) {
+				case node_hex8:
+					drawStringBytes(i, data, counter, 1);
+					drawBytes(i, data, counter, 1);
 
-			counter += 1;
-			break;
-		case node_hex16:
-			drawStringBytes(i, data, counter, 2);
-			drawBytes(i, data, counter, 2);
+					num = *(uint8_t*)((uintptr_t)data + counter);
+					drawNumber(i, num, &pad);
+					drawHexNumber(i, num, pad);
 
-			num = *(uint16_t*)((uintptr_t)data + counter);
-			drawNumber(i, num, &pad);
-			drawHexNumber(i, num, pad);
+					counter += 1;
+					break;
+				case node_hex16:
+					drawStringBytes(i, data, counter, 2);
+					drawBytes(i, data, counter, 2);
 
-			counter += 2;
-			break;
-		case node_hex32:
-			drawStringBytes(i, data, counter, 4);
-			drawBytes(i, data, counter, 4);
+					num = *(uint16_t*)((uintptr_t)data + counter);
+					drawNumber(i, num, &pad);
+					drawHexNumber(i, num, pad);
 
-			floatNum = *(float*)((uintptr_t)data + counter);
-			drawFloat(i, floatNum, &pad);
+					counter += 2;
+					break;
+				case node_hex32:
+					drawStringBytes(i, data, counter, 4);
+					drawBytes(i, data, counter, 4);
 
-			num = *(uint32_t*)((uintptr_t)data + counter);
-			drawNumber(i, num, &pad);
-			drawHexNumber(i, num, pad);
+					floatNum = *(float*)((uintptr_t)data + counter);
+					drawFloat(i, floatNum, &pad);
 
-			counter += 4;
-			break;
-		case node_hex64:
-			drawStringBytes(i, data, counter, 8);
-			drawBytes(i, data, counter, 8);
+					num = *(uint32_t*)((uintptr_t)data + counter);
+					drawNumber(i, num, &pad);
+					drawHexNumber(i, num, pad);
 
-			doubleNum = *(double*)((uintptr_t)data + counter);
-			drawDouble(i, doubleNum, &pad);
+					counter += 4;
+					break;
+				case node_hex64:
+					drawStringBytes(i, data, counter, 8);
+					drawBytes(i, data, counter, 8);
 
-			num = *(uint64_t*)((uintptr_t)data + counter);
-			drawNumber(i, num, &pad);
-			drawHexNumber(i, num, pad);
+					doubleNum = *(double*)((uintptr_t)data + counter);
+					drawDouble(i, doubleNum, &pad);
 
-			counter += 8;
-			break;
-		case node_int64:
-			drawInteger(i, *(int64_t*)((uintptr_t)data + counter), node_int64);
-			counter += 8;
-			break;
-		case node_int32:
-			drawInteger(i, *(int32_t*)((uintptr_t)data + counter), node_int32);
-			counter += 4;
-			break;
-		case node_int16:
-			drawInteger(i, *(int16_t*)((uintptr_t)data + counter), node_int16);
-			counter += 2;
-			break;
-		case node_int8:
-			drawInteger(i, *(int8_t*)((uintptr_t)data + counter), node_int8);
-			counter += 1;
-			break;
-		}
+					num = *(uint64_t*)((uintptr_t)data + counter);
+					drawNumber(i, num, &pad);
+					drawHexNumber(i, num, pad);
+
+					counter += 8;
+					break;
+				case node_int64:
+					drawInteger(i, *(int64_t*)((uintptr_t)data + counter), node_int64);
+					counter += 8;
+					break;
+				case node_int32:
+					drawInteger(i, *(int32_t*)((uintptr_t)data + counter), node_int32);
+					counter += 4;
+					break;
+				case node_int16:
+					drawInteger(i, *(int16_t*)((uintptr_t)data + counter), node_int16);
+					counter += 2;
+					break;
+				case node_int8:
+					drawInteger(i, *(int8_t*)((uintptr_t)data + counter), node_int8);
+					counter += 1;
+					break;
+				}
+			}
 	}
 
 	if (!g_HoveringPointer) {
@@ -613,3 +660,10 @@ void uClass::drawNodes() {
 }
 
 std::vector<uClass> g_Classes = { uClass(50), uClass(50), uClass(50) };
+
+void initClasses(bool isX32) {
+	if (g_Classes.empty() || isX32 != mem::x32) {
+		mem::x32 = isX32;
+		g_Classes = { uClass(50), uClass(50), uClass(50) };
+	}
+}

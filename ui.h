@@ -63,16 +63,62 @@ void ui::renderMain() {
 
         ImVec2 wndSize = ImGui::GetWindowSize();
 
-        ImGui::BeginChild("ClassesChild", ImVec2(columnOffset - 15, wndSize.y - 54), 1);
+        ImGui::BeginChild("ClassesChild", ImVec2(columnOffset - 15, wndSize.y - 54), 1, ImGuiWindowFlags_NoScrollbar);
+
+        static char renameBuf[64] = { 0 };
+        static int renamedClass = -1;
         static int selectedClass = 0;
         for (int i = 0; i < g_Classes.size(); i++) {
             auto& lClass = g_Classes[i];
-            if (ImGui::Selectable(lClass.name, (i == selectedClass))) {
-                selectedClass = i;
-                updateAddress(lClass.address);
-                updateAddressBox(addressInput, lClass.addressInput);
+
+            if (renamedClass != i) {
+                if (ImGui::Selectable(lClass.name, (i == selectedClass))) {
+                    selectedClass = i;
+                    updateAddress(lClass.address);
+                    updateAddressBox(addressInput, lClass.addressInput);
+                }
+
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                    renamedClass = i;
+                    memset(renameBuf, 0, sizeof(renameBuf));
+                    memcpy(renameBuf, lClass.name, sizeof(renameBuf));
+                }
+            }
+            else {
+                ImGui::SetKeyboardFocusHere();
+
+                if (ImGui::InputText("##RenameClass", renameBuf, sizeof(renameBuf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    memcpy(lClass.name, renameBuf, sizeof(renameBuf));
+                    renamedClass = -1;
+                }
+
+                if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    renamedClass = -1;
+                }
             }
         }
+
+        ImGui::SetCursorPos(ImVec2(columnOffset - 37, wndSize.y - 80));
+        if (ImGui::Button("+")) {
+            g_Classes.push_back({ uClass(50) });
+        }
+
+        ImGui::SetCursorPos(ImVec2(columnOffset - 58, wndSize.y - 80));
+        if (ImGui::Button("-")) {
+            if (g_Classes.size() > 0) {
+                g_Classes.erase(g_Classes.begin() + selectedClass);
+                if (selectedClass > 0 && selectedClass > g_Classes.size() - 1) {
+                    selectedClass--;
+                }
+            }
+        }
+
+        if (g_Classes.empty()) {
+            ImGui::EndChild();
+            ImGui::End();
+            return;
+        }
+
         ImGui::EndChild();
 
         uClass& sClass = g_Classes[selectedClass];
