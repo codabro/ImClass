@@ -160,15 +160,15 @@ void uClass::resize(int mod) {
 		int remaining = mod;
 		while (remaining > 0) {
 			if (remaining >= 8) {
-				remaining = remaining % 8;
+				remaining = remaining - 8;
 				nodes.push_back({ 0, node_hex64, false });
 			}
 			else if (remaining >= 4) {
-				remaining = remaining % 4;
+				remaining = remaining - 4;
 				nodes.push_back({ 0, node_hex32, false });
 			}
 			else if (remaining >= 2) {
-				remaining = remaining % 2;
+				remaining = remaining - 2;
 				nodes.push_back({ 0, node_hex16, false });
 			}
 			else if (remaining >= 1) {
@@ -524,6 +524,32 @@ void uClass::drawControllers(int i, int counter) {
 
 			ImGui::EndMenu();
 		}
+
+		if (ImGui::BeginMenu("Add Bytes")) {
+			if (ImGui::Selectable("4 Bytes")) {
+				resize(4);
+			}
+			if (ImGui::Selectable("8 Bytes")) {
+				resize(8);
+			}
+			if (ImGui::Selectable("64 Bytes")) {
+				resize(64);
+			}
+			if (ImGui::Selectable("512 Bytes")) {
+				resize(512);
+			}
+			if (ImGui::Selectable("1024 Bytes")) {
+				resize(1024);
+			}
+			if (ImGui::Selectable("4096 Bytes")) {
+				resize(4096);
+			}
+			if (ImGui::Selectable("8192 Bytes")) {
+				resize(8192);
+			}
+			ImGui::EndMenu();
+		}
+
 		if (ImGui::Selectable("Delete")) {
 			for (int j = nodes.size() - 1; j >= 0; j--) {
 				if (nodes[j].selected) {
