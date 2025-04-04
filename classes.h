@@ -143,15 +143,6 @@ void uClass::resize(int mod) {
 		return;
 	}
 
-	auto newData = (BYTE*)realloc(data, newSize);
-	if (!newData) {
-		MessageBoxA(0, "Failed to reallocate memory!", "ERROR", MB_ICONERROR);
-		return;
-	}
-
-	data = newData;
-	size = newSize;
-
 	if (mod < 0) {
 		nodes.erase(nodes.begin() + nodes.size() - 1);
 		sizeToNodes();
@@ -176,6 +167,7 @@ void uClass::resize(int mod) {
 				nodes.push_back({ 0, node_hex8, false });
 			}
 		}
+		sizeToNodes();
 	}
 }
 
