@@ -106,6 +106,8 @@ void ui::renderMain() {
         ImGui::SetCursorPos(ImVec2(columnOffset - 58, wndSize.y - 80));
         if (ImGui::Button("-")) {
             if (g_Classes.size() > 0) {
+                uClass& sClass = g_Classes[selectedClass];
+                free(sClass.data);
                 g_Classes.erase(g_Classes.begin() + selectedClass);
                 if (selectedClass > 0 && selectedClass > g_Classes.size() - 1) {
                     selectedClass--;
