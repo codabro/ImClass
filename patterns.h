@@ -42,8 +42,8 @@ public:
 namespace pattern
 {
 	std::optional<PatternInfo> detectPatternType(const std::string& in);
-	std::optional<PatternScanResult> scanPattern(const PatternInfo& patternInfo, const std::string& dllName);
-	std::optional<PatternScanResult> findBytePattern(uintptr_t baseAddress, size_t size, uint8_t* pattern, const char* mask);
+	std::optional<PatternScanResult> scanPattern(PatternInfo& patternInfo, const std::string& dllName);
+	std::optional<PatternScanResult> findBytePattern(uintptr_t baseAddress, size_t size, const uint8_t* signature, const char* mask);
 	bool patternToMask(const PatternInfo& patternInfo, std::vector<uint8_t>& outBytes, std::string& outMask);
 }
 
@@ -89,7 +89,7 @@ inline std::optional<PatternInfo> pattern::detectPatternType(const std::string& 
 
 inline bool pattern::patternToMask(const PatternInfo& patternInfo, std::vector<uint8_t>& outBytes, std::string& outMask)
 {
-	const std::string& pattern = patternInfo.pattern;
+	const std::string& signature = patternInfo.pattern;
 
 	outBytes.clear();
 	outMask.clear();
@@ -97,9 +97,9 @@ inline bool pattern::patternToMask(const PatternInfo& patternInfo, std::vector<u
 	if (patternInfo.type == PatternType::IDA_SIGNATURE) {
 
 		std::string byteStr;
-		size_t length = pattern.length();
+		size_t length = signature.length();
 		for (size_t i = 0; i <= length; i++) {
-			char c = pattern[i];
+			char c = signature[i];
 
 			if (c == ' ' || i == length) { // processes the last byte at spaces, but it will skip the last byte if not specified otherwise
 				if (!byteStr.empty()) {
@@ -124,13 +124,13 @@ inline bool pattern::patternToMask(const PatternInfo& patternInfo, std::vector<u
 	}
 
 	if (patternInfo.type == PatternType::BYTE_PATTERN) {
-		for (size_t i = 0; i < pattern.length();) { // don't iterate here, it can be incremented by varying numbers
+		for (size_t i = 0; i < signature.length();) { // don't iterate here, it can be incremented by varying numbers
 
-			auto currentCharacter = pattern[i];
+			auto currentCharacter = signature[i];
 
-			if (currentCharacter == '\\' && i + 3 < pattern.length() && pattern[i + 1] == 'x')
+			if (currentCharacter == '\\' && i + 3 < signature.length() && signature[i + 1] == 'x')
 			{
-				std::string byteStr = pattern.substr(i + 2, 2);
+				std::string byteStr = signature.substr(i + 2, 2);
 				outBytes.push_back((uint8_t)(std::stoi(byteStr, nullptr, 16)));
 				outMask += 'x';
 				i += 4;
@@ -139,7 +139,7 @@ inline bool pattern::patternToMask(const PatternInfo& patternInfo, std::vector<u
 				outBytes.push_back(0);  // just a placeholder, never used
 				outMask += '?';
 
-				while (i < pattern.length() && pattern[i] == '?') {
+				while (i < signature.length() && signature[i] == '?') {
 					i++;
 				}
 			}
@@ -149,9 +149,10 @@ inline bool pattern::patternToMask(const PatternInfo& patternInfo, std::vector<u
 		}
 		return true;
 	}
+	return false;
 }
 
-inline std::optional<PatternScanResult> pattern::findBytePattern(uintptr_t baseAddress, size_t size, uint8_t* pattern, const char* mask) {
+inline std::optional<PatternScanResult> pattern::findBytePattern(uintptr_t baseAddress, size_t size, const uint8_t* signature, const char* mask) {
 	PatternScanResult result;
 
 	size_t patternLength = strlen(mask);
@@ -165,11 +166,11 @@ inline std::optional<PatternScanResult> pattern::findBytePattern(uintptr_t baseA
 	std::vector<uint8_t> buffer(size);
 
 	SIZE_T bytesRead;
-	if (!ReadProcessMemory(mem::memHandle, (LPCVOID)(baseAddress), buffer.data(), size, &bytesRead) || bytesRead < patternLength) {
+	if (!mem::read(baseAddress, buffer.data(), size)) {
 		return std::nullopt;
 	}
 
-	for (size_t i = 0; i <= bytesRead - patternLength; i++) {
+	for (size_t i = 0; i <= size - patternLength; i++) {
 		bool found = true;
 
 		for (size_t j = 0; j < patternLength; j++) {
@@ -177,7 +178,7 @@ inline std::optional<PatternScanResult> pattern::findBytePattern(uintptr_t baseA
 			if (mask[j] == '?')
 				continue;
 
-			if (buffer[i + j] != pattern[j]) {
+			if (buffer[i + j] != signature[j]) {
 				found = false;
 				break;
 			}
@@ -196,8 +197,13 @@ inline std::optional<PatternScanResult> pattern::findBytePattern(uintptr_t baseA
 }
 
 
-inline std::optional<PatternScanResult> pattern::scanPattern(const PatternInfo& patternInfo, const std::string& dllName)
+inline std::optional<PatternScanResult> pattern::scanPattern(PatternInfo& patternInfo, const std::string& dllName)
 {
+	auto patternType = detectPatternType(patternInfo.pattern);
+
+	if (patternType != std::nullopt) {
+		patternInfo.type = patternType->type;
+	}
 
 	std::wstring wideName(dllName.begin(), dllName.end()); // windows api requires widestring, maybe change input type?
 	DWORD pid = mem::pid;
@@ -226,83 +232,4 @@ inline std::optional<PatternScanResult> pattern::scanPattern(const PatternInfo& 
 	);
 
 	return result;
-}
-
-// gmod (get rid of this in prod. branch and replace with better testing)
-inline void testPatternScanning() {
-
-	const char* idaPattern = "48 89 5C 24 ? 57 48 83 EC ? 48 8B 01 41 B8";
-	const char* bytePattern = "\\x48\\x89\\x5C\\x24\\?\\x57\\x48\\x83\\xEC\\?\\x48\\x8B\\x01\\x41\\xB8";
-
-	auto idaPatternInfo = pattern::detectPatternType(idaPattern);
-	auto bytePatternInfo = pattern::detectPatternType(bytePattern);
-
-	if (!idaPatternInfo || !bytePatternInfo) {
-		MessageBoxA(NULL, "failed to differentiate pattern types", "Error", MB_ICONERROR);
-		return;
-	}
-
-	moduleInfo clientDllInfo;
-	if (!mem::getModuleInfo(mem::pid, L"client.dll", &clientDllInfo)) {
-		MessageBoxA(NULL, "failed to find client.dll", "Error", MB_ICONERROR);
-		return;
-	}
-
-	std::vector<uint8_t> idaBytes;
-	std::string idaMask;
-	std::vector<uint8_t> bytePatternBytes;
-	std::string bytePatternMask;
-
-	if (!pattern::patternToMask(*idaPatternInfo, idaBytes, idaMask) ||
-		!pattern::patternToMask(*bytePatternInfo, bytePatternBytes, bytePatternMask)) {
-		MessageBoxA(NULL, "failed to convert patterns to generic format", "Error", MB_ICONERROR);
-		return;
-	}
-
-	auto idaResult = pattern::findBytePattern(clientDllInfo.base, clientDllInfo.size,
-                                           idaBytes.data(), idaMask.c_str());
-
-	auto byteResult = pattern::findBytePattern(clientDllInfo.base, clientDllInfo.size,
-                                            bytePatternBytes.data(), bytePatternMask.c_str());
-
-	std::string idaResultStr;
-	std::string byteResultStr;
-
-	if (idaResult) {
-		idaResultStr = "IDA pattern found at: 0x" + std::to_string(idaResult->matches.front()) +
-			"\ntotal matches: " + std::to_string(idaResult->matches.size());
-	}
-	else {
-		idaResultStr = "IDA pattern not found";
-	}
-
-	if (byteResult) {
-		byteResultStr = "Byte pattern found at: 0x" + std::to_string(byteResult->matches.front()) +
-			"\ntotal matches: " + std::to_string(byteResult->matches.size());
-	}
-	else {
-		byteResultStr = "Byte pattern not found";
-	}
-
-	std::string comparisonStr;
-	if (idaResult && byteResult) {
-		if (idaResult->matches.front() == byteResult->matches.front()) {
-			comparisonStr = "both patterns found the same address";
-		}
-		else {
-			comparisonStr = "patterns found different addresses";
-		}
-	}
-	else if (idaResult) {
-		comparisonStr = "only IDA pattern found a match";
-	}
-	else if (byteResult) {
-		comparisonStr = "only byte pattern found a match";
-	}
-	else {
-		comparisonStr = "no matches found for either pattern";
-	}
-
-	std::string finalMessage = idaResultStr + "\n\n" + byteResultStr + "\n\n" + comparisonStr;
-	MessageBoxA(NULL, finalMessage.c_str(), "sigscan test results", MB_ICONINFORMATION);
 }

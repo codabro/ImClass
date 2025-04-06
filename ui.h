@@ -12,11 +12,17 @@
 namespace ui {
     bool open = true;
     bool processWindow = false;
-    bool signaturePopup = false;
+    bool signaturesWindow = false;
+    bool sigScanWindow = false;
     inline std::optional<PatternScanResult> patternResults;
     char addressInput[256] = "0";
+	char module[512] = { 0 };
+	char signature[512] = { 0 };
+
+	int selectedClass = 0;
 
     ImVec2 mainPos;
+    ImVec2 signaturePos = {0, 0};
 
     void init(HWND hwnd);
 	void renderProcessWindow();
@@ -27,7 +33,8 @@ namespace ui {
     std::string toHexString(uintptr_t address, int width = 0);
     bool isValidHex(std::string& str);
     void updateAddress(uintptr_t newAddress, uintptr_t* dest = 0);
-    void displaySignatures();
+    void renderSignatureResults();
+    void renderSignatureScan();
     void updateAddressBox(char* dest, char* src);
 }
 
@@ -36,21 +43,115 @@ void ui::updateAddressBox(char* dest, char* src) {
     memcpy(dest, src, strlen(src));
 }
 
-void ui::displaySignatures() {
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+inline void ui::renderSignatureScan()
+{
+	static bool oSigScanWindow = false;
+	if (!sigScanWindow) {
+		oSigScanWindow = sigScanWindow;
+		return;
+	}
 
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Signatures", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::Text("placeholder");
+	const float entryHeight = ImGui::GetTextLineHeightWithSpacing();
+	constexpr float headerHeight = 30.0f;
+	constexpr float footerHeight = 30.0f;
+	constexpr float minWidth = 300.0f;
+	constexpr float padding = 20.0f;
 
-        if (ImGui::Button("Close"))
-            ImGui::CloseCurrentPopup();
+	constexpr int numElements = 3;
+	const float contentHeight = (entryHeight * numElements) + padding;
+	const float windowHeight = min(headerHeight + contentHeight + footerHeight, 300.0f);
+    static bool hasSetPos = false;
 
-        ImGui::EndPopup();
-    }
+	if (sigScanWindow != oSigScanWindow) {
+        if (hasSetPos) {
+            ImGui::SetNextWindowPos(signaturePos, ImGuiCond_Always);
+        }
+        else
+        {
+            ImVec2 defaultPos = ImVec2(mainPos.x + 50, mainPos.y + 50);
+            ImGui::SetNextWindowPos(defaultPos, ImGuiCond_Always);
+			signaturePos = ImVec2(defaultPos);
+            hasSetPos = true;
+        }
+		ImGui::SetNextWindowSize(ImVec2(minWidth, windowHeight), ImGuiCond_Always);
+	}
+	oSigScanWindow = sigScanWindow;
+
+	ImGui::Begin("Signature Scanner", &sigScanWindow);
+	ImGui::InputText("Module", module, sizeof(module));
+	ImGui::InputText("Signature", signature, sizeof(signature));
+	if (ImGui::Button("Scan")) {
+		PatternInfo pattern;
+		pattern.pattern = signature;
+		patternResults = pattern::scanPattern(pattern, module);
+		if (patternResults != std::nullopt && !patternResults.value().matches.empty()) {
+			signaturesWindow = true;
+		}
+		sigScanWindow = false;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Cancel")) {
+		sigScanWindow = false;
+	}
+
+    signaturePos = ImGui::GetWindowPos();
+
+	ImGui::End();
+}
 
 
+void ui::renderSignatureResults() {
+	static bool oSignaturesWindow = false;
+	if (!signaturesWindow) {
+		oSignaturesWindow = signaturesWindow;
+		return;
+	}
+
+	const float entryHeight = ImGui::GetTextLineHeightWithSpacing();
+	constexpr float headerHeight = 30.0f;
+	constexpr float footerHeight = 30.0f;
+	constexpr float minWidth = 200.0f;
+
+	const size_t numEntries = patternResults.has_value() && !patternResults.value().matches.empty()
+		? patternResults.value().matches.size()
+		: 1;
+
+	const float windowHeight = min(headerHeight + (entryHeight * numEntries) + footerHeight, 500.0f);
+
+	if (signaturesWindow != oSignaturesWindow) {
+        ImGui::SetNextWindowPos(signaturePos, ImGuiCond_Always);
+		ImGui::SetNextWindowSize(ImVec2(minWidth, windowHeight), ImGuiCond_Always);
+	}
+	oSignaturesWindow = signaturesWindow;
+
+	ImGui::Begin("Signatures", &signaturesWindow);
+	const ImVec2 wndSize = ImGui::GetWindowSize();
+	ImGui::BeginChild("##SignaturesList", ImVec2(0, wndSize.y - 30));
+
+	if (patternResults.has_value() && !patternResults.value().matches.empty()) {
+
+        PatternScanResult& results = patternResults.value();
+
+		for (uintptr_t match : results.matches) {
+			const std::string address = toHexString(match);
+            const char* cAddr = address.c_str();
+			if (ImGui::Selectable(cAddr)) {
+                if (g_Classes.size() >= selectedClass) {
+                    uClass& cClass = g_Classes[selectedClass];
+                    updateAddressBox(addressInput, (char*)(cAddr));
+                    updateAddressBox(cClass.addressInput, (char*)(cAddr));
+                    updateAddress(match, &cClass.address);
+                    signaturesWindow = false;
+                }
+			}
+		}
+	}
+	else {
+		ImGui::Text("No signatures found.");
+	}
+
+	ImGui::EndChild();
+	ImGui::End();
 }
 
 void ui::updateAddress(uintptr_t newAddress, uintptr_t* dest) {
@@ -73,19 +174,9 @@ void ui::renderMain() {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Tools")) {
-            static char module[512] = { 0 };
-            static char signature[512] = { 0 };
-            ImGui::InputText("module", module, sizeof(module));
-			ImGui::InputText("signature", signature, sizeof(signature));
-            if (ImGui::Button("sig scan"))
+            if (ImGui::Button("Signature Scanner"))
             {
-                PatternInfo pattern;
-				pattern.pattern = signature;
-                patternResults = pattern::scanPattern(pattern, module);
-				if (patternResults != std::nullopt && !patternResults.value().matches.empty()) {
-                    ImGui::OpenPopup("Signatures");
-				}
-
+                sigScanWindow = true;
             }
             ImGui::EndMenu();
         }
@@ -102,8 +193,8 @@ void ui::renderMain() {
         ImGui::BeginChild("ClassesChild", ImVec2(columnOffset - 15, wndSize.y - 54), 1, ImGuiWindowFlags_NoScrollbar);
 
         static char renameBuf[64] = { 0 };
-        static int renamedClass = -1;
-        static int selectedClass = 0;
+		static int renamedClass = -1;
+
         for (int i = 0; i < g_Classes.size(); i++) {
             auto& lClass = g_Classes[i];
 
@@ -169,7 +260,6 @@ void ui::renderMain() {
             updateAddressBox(sClass.addressInput, addressInput);
         }
 
-        ui::displaySignatures();
 
         static bool oInputFocused = false;
 
@@ -248,6 +338,8 @@ bool ui::searchMatches(std::string str, std::string term) {
 void ui::render() {
     renderMain();
     renderProcessWindow();
+    renderSignatureScan();
+    renderSignatureResults();    
 }
 
 void ui::init(HWND hwnd) {
