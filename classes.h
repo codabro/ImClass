@@ -23,7 +23,23 @@ enum nodeType {
 	node_uint32,
 	node_uint64,
 	node_float,
-	node_double
+	node_double,
+	node_vector4,
+	node_vector3,
+	node_vector2,
+	node_max
+};
+
+struct Vector4 {
+	float x, y, z, w;
+};
+
+struct Vector3 {
+	float x, y, z;
+};
+
+struct Vector2 {
+	float x, y;
 };
 
 struct nodeTypeInfo {
@@ -34,20 +50,23 @@ struct nodeTypeInfo {
 };
 
 nodeTypeInfo nodeData[] = {
-	{node_hex8, 1, "Hex8", ImColor(255, 255, 255)},
-	{node_hex16, 2, "Hex16", ImColor(255, 255, 255)},
-	{node_hex32, 4, "Hex32", ImColor(255, 255, 255)},
-	{node_hex64, 8, "Hex64", ImColor(255, 255, 255)},
-	{node_int8, 1, "Int8", ImColor(255, 200, 0)},
-	{node_int16, 2, "Int16", ImColor(255, 200, 0)},
-	{node_int32, 4, "Int32", ImColor(255, 200, 0)},
-	{node_int64, 8, "Int64", ImColor(255, 200, 0)},
-	{node_uint8, 1, "UInt8", ImColor(7, 247, 163)},
-	{node_uint16, 2, "UInt16", ImColor(7, 247, 163)},
-	{node_uint32, 4, "UInt32", ImColor(7, 247, 163)},
-	{node_uint64, 8, "UInt64", ImColor(7, 247, 163)},
-	{node_float, 4, "Float", ImColor(225, 143, 255)},
-	{node_double, 8, "Double", ImColor(187, 0, 255)},
+	{node_hex8, sizeof(uint8_t), "Hex8", ImColor(255, 255, 255)},
+	{node_hex16, sizeof(uint16_t), "Hex16", ImColor(255, 255, 255)},
+	{node_hex32, sizeof(uint32_t), "Hex32", ImColor(255, 255, 255)},
+	{node_hex64, sizeof(uint64_t), "Hex64", ImColor(255, 255, 255)},
+	{node_int8, sizeof(int8_t), "Int8", ImColor(255, 200, 0)},
+	{node_int16, sizeof(int16_t), "Int16", ImColor(255, 200, 0)},
+	{node_int32, sizeof(int32_t), "Int32", ImColor(255, 200, 0)},
+	{node_int64, sizeof(int64_t), "Int64", ImColor(255, 200, 0)},
+	{node_uint8, sizeof(uint8_t), "UInt8", ImColor(7, 247, 163)},
+	{node_uint16, sizeof(uint16_t), "UInt16", ImColor(7, 247, 163)},
+	{node_uint32, sizeof(uint32_t), "UInt32", ImColor(7, 247, 163)},
+	{node_uint64, sizeof(uint64_t), "UInt64", ImColor(7, 247, 163)},
+	{node_float, sizeof(float), "Float", ImColor(225, 143, 255)},
+	{node_double, sizeof(double), "Double", ImColor(187, 0, 255)},
+	{node_vector4, sizeof(Vector4), "Vector4", ImColor(115, 255, 124)},
+	{node_vector3, sizeof(Vector3), "Vector3", ImColor(115, 255, 124)},
+	{node_vector2, sizeof(Vector2), "Vector2", ImColor(115, 255, 124)},
 };
 
 bool g_HoveringPointer = false;
@@ -131,6 +150,9 @@ public:
 	void drawUInteger(int i, uint64_t value, nodeType type);
 	void drawFloat(int i, float value, nodeType type);
 	void drawDouble(int i, double value, nodeType type);
+	void drawVector4(int i, Vector4 value, nodeType type);
+	void drawVector3(int i, Vector3 value, nodeType type);
+	void drawVector2(int i, Vector2 value, nodeType type);
 };
 
 void uClass::sizeToNodes() {
@@ -215,6 +237,48 @@ int uClass::drawVariableName(int i, nodeType type) {
 	ImGui::PopStyleColor();
 
 	return typenameSize.x + nameSize.x;
+}
+
+void uClass::drawVector4(int i, Vector4 value, nodeType type) {
+	int y = 10 + 12 * i;
+	auto& node = nodes[i];
+
+	int xPad = drawVariableName(i, type);
+
+	std::string vec = std::format("{:.3f}, {:.3f}, {:.3f}, {:.3f}", value.x, value.y, value.z, value.w);
+	std::string toDraw = std::format("=  ({})", vec);
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::Text(toDraw.c_str());
+
+	copyPopup(i, vec, "vec4");
+}
+
+void uClass::drawVector3(int i, Vector3 value, nodeType type) {
+	int y = 10 + 12 * i;
+	auto& node = nodes[i];
+
+	int xPad = drawVariableName(i, type);
+
+	std::string vec = std::format("{:.3f}, {:.3f}, {:.3f}", value.x, value.y, value.z);
+	std::string toDraw = std::format("=  ({})", vec);
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::Text(toDraw.c_str());
+
+	copyPopup(i, vec, "vec3");
+}
+
+void uClass::drawVector2(int i, Vector2 value, nodeType type) {
+	int y = 10 + 12 * i;
+	auto& node = nodes[i];
+
+	int xPad = drawVariableName(i, type);
+
+	std::string vec = std::format("{:.3f}, {:.3f}", value.x, value.y);
+	std::string toDraw = std::format("=  ({})", vec);
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::Text(toDraw.c_str());
+
+	copyPopup(i, vec, "vec2");
 }
 
 void uClass::drawFloat(int i, float value, nodeType type) {
@@ -586,6 +650,18 @@ void uClass::drawControllers(int i, int counter) {
 				changeType(node_double);
 			}
 
+			ImGui::Separator();
+
+			if (ImGui::Selectable("Vector4")) {
+				changeType(node_vector4);
+			}
+			if (ImGui::Selectable("Vector3")) {
+				changeType(node_vector3);
+			}
+			if (ImGui::Selectable("Vector2")) {
+				changeType(node_vector2);
+			}
+
 			ImGui::EndMenu();
 		}
 
@@ -724,9 +800,18 @@ void uClass::drawNodes() {
 				case node_double:
 					drawDouble(i, *(double*)dataPos, node_double);
 					break;
+				case node_vector4:
+					drawVector4(i, *(Vector4*)dataPos, node_vector4);
+					break;
+				case node_vector3:
+					drawVector3(i, *(Vector3*)dataPos, node_vector3);
+					break;
+				case node_vector2:
+					drawVector2(i, *(Vector2*)dataPos, node_vector2);
+					break;
 				}
 
-				if (node.type < 0 || node.type > node_double) {
+				if (node.type < 0 || node.type >= node_max) {
 					continue;
 				}
 
@@ -743,7 +828,7 @@ void uClass::drawNodes() {
 	}
 }
 
-std::vector<uClass> g_Classes = { uClass(50), uClass(50), uClass(50) };
+std::vector<uClass> g_Classes = { uClass(50) };
 
 void initClasses(bool isX32) {
 	if (g_Classes.empty() || isX32 != mem::x32) {
