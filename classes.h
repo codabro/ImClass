@@ -21,37 +21,33 @@ enum nodeType {
 	node_uint8,
 	node_uint16,
 	node_uint32,
-	node_uint64
+	node_uint64,
+	node_float,
+	node_double
 };
 
-uint8_t typeSizes[] = {
-	1,
-	2,
-	4,
-	8,
-	1,
-	2,
-	4,
-	8,
-	1,
-	2,
-	4,
-	8
+struct nodeTypeInfo {
+	nodeType type;
+	uint8_t size;
+	char name[21];
+	ImColor color;
 };
 
-char typeNames[][21] = {
-	"Hex8",
-	"Hex16",
-	"Hex32",
-	"Hex64",
-	"Int8",
-	"Int16",
-	"Int32",
-	"Int64",
-	"UInt8",
-	"UInt16",
-	"UInt32",
-	"UInt64"
+nodeTypeInfo nodeData[] = {
+	{node_hex8, 1, "Hex8", ImColor(255, 255, 255)},
+	{node_hex16, 2, "Hex16", ImColor(255, 255, 255)},
+	{node_hex32, 4, "Hex32", ImColor(255, 255, 255)},
+	{node_hex64, 8, "Hex64", ImColor(255, 255, 255)},
+	{node_int8, 1, "Int8", ImColor(255, 200, 0)},
+	{node_int16, 2, "Int16", ImColor(255, 200, 0)},
+	{node_int32, 4, "Int32", ImColor(255, 200, 0)},
+	{node_int64, 8, "Int64", ImColor(255, 200, 0)},
+	{node_uint8, 1, "UInt8", ImColor(7, 247, 163)},
+	{node_uint16, 2, "UInt16", ImColor(7, 247, 163)},
+	{node_uint32, 4, "UInt32", ImColor(7, 247, 163)},
+	{node_uint64, 8, "UInt64", ImColor(7, 247, 163)},
+	{node_float, 4, "Float", ImColor(225, 143, 255)},
+	{node_double, 8, "Double", ImColor(187, 0, 255)},
 };
 
 bool g_HoveringPointer = false;
@@ -72,7 +68,7 @@ public:
 		}
 
 		type = aType;
-		size = typeSizes[aType];
+		size = nodeData[aType].size;
 		selected = aSelected;
 	}
 };
@@ -95,7 +91,7 @@ public:
 		for (int i = 0; i < nodeCount; i++) {
 			nodeBase node = {0, mem::x32 ? node_hex32 : node_hex64};
 			nodes.push_back(node);
-			size += typeSizes[node.type];
+			size += nodeData[node.type].size;
 		}
 		memset(name, 0, sizeof(name));
 		memset(addressInput, 0, sizeof(addressInput));
@@ -129,8 +125,12 @@ public:
 	void changeType(int i, nodeType newType, bool selectNew = false, int* newNodes = 0);
 	void changeType(nodeType newType);
 
+	int drawVariableName(int i, nodeType type);
+	void copyPopup(int i, std::string toCopy, std::string id);
 	void drawInteger(int i, int64_t value, nodeType type);
 	void drawUInteger(int i, uint64_t value, nodeType type);
+	void drawFloat(int i, float value, nodeType type);
+	void drawDouble(int i, double value, nodeType type);
 };
 
 void uClass::sizeToNodes() {
@@ -182,61 +182,88 @@ void uClass::resize(int mod) {
 			}
 		}
 		sizeToNodes();
+		memset(data, 0, size);
 	}
+}
+
+void uClass::copyPopup(int i, std::string toCopy, std::string id) {
+	if (ImGui::BeginPopupContextItem(("copyvar_" + id + std::to_string(i)).c_str())) {
+		if (ImGui::Selectable("Copy value")) {
+			ImGui::SetClipboardText(toCopy.c_str());
+		}
+		ImGui::EndPopup();
+	}
+}
+
+int uClass::drawVariableName(int i, nodeType type) {
+	int y = 10 + 12 * i;
+	auto& node = nodes[i];
+	ImVec2 nameSize = ImGui::CalcTextSize(node.name);
+	
+	auto& data = nodeData[type];
+	auto typeName = data.name;
+	ImVec2 typenameSize = ImGui::CalcTextSize(typeName);
+
+	ImGui::PushStyleColor(ImGuiCol_Text, data.color.Value);
+	ImGui::SetCursorPos(ImVec2(180, y));
+	ImGui::Text(typeName);
+	ImGui::PopStyleColor();
+
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.9f, .9f, .9f, 1.f));
+	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + 15, y));
+	ImGui::Text(node.name);
+	ImGui::PopStyleColor();
+
+	return typenameSize.x + nameSize.x;
+}
+
+void uClass::drawFloat(int i, float value, nodeType type) {
+	int y = 10 + 12 * i;
+	auto& node = nodes[i];
+
+	int xPad = drawVariableName(i, type);
+
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::Text("=  %.3f", value);
+
+	copyPopup(i, std::to_string(value), "float");
+}
+
+void uClass::drawDouble(int i, double value, nodeType type) {
+	int y = 10 + 12 * i;
+	auto& node = nodes[i];
+
+	int xPad = drawVariableName(i, type);
+
+	std::string toDraw = std::format("=  {:.6f}", value);
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::Text(toDraw.c_str());
+
+	copyPopup(i, std::to_string(value), "double");
 }
 
 void uClass::drawInteger(int i, int64_t value, nodeType type) {
 	int y = 10 + 12 * i;
 	auto& node = nodes[i];
-	ImVec2 nameSize = ImGui::CalcTextSize(node.name);
-	ImVec2 typenameSize = ImGui::CalcTextSize(typeNames[type]);
+	
+	int xPad = drawVariableName(i, type);
 
-	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 218, 133).Value);
-	ImGui::SetCursorPos(ImVec2(180, y));
-	ImGui::Text(typeNames[type]);
-	ImGui::PopStyleColor();
-
-	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.9f, .9f, .9f, 1.f));
-	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + 15, y));
-	ImGui::Text(node.name);
-	ImGui::PopStyleColor();
-
-	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + nameSize.x + 30, y));
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
 	ImGui::Text("=  %lld", value);
 
-	if (ImGui::BeginPopupContextItem(("copyintvar_" + std::to_string(i)).c_str())) {
-		if (ImGui::Selectable("Copy value")) {
-			ImGui::SetClipboardText(std::to_string(value).c_str());
-		}
-		ImGui::EndPopup();
-	}
+	copyPopup(i, std::to_string(value), "int");
 }
 
 void uClass::drawUInteger(int i, uint64_t value, nodeType type) {
 	int y = 10 + 12 * i;
 	auto& node = nodes[i];
-	ImVec2 nameSize = ImGui::CalcTextSize(node.name);
-	ImVec2 typenameSize = ImGui::CalcTextSize(typeNames[type]);
 
-	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 218, 133).Value);
-	ImGui::SetCursorPos(ImVec2(180, y));
-	ImGui::Text(typeNames[type]);
-	ImGui::PopStyleColor();
+	int xPad = drawVariableName(i, type);
 
-	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.9f, .9f, .9f, 1.f));
-	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + 15, y));
-	ImGui::Text(node.name);
-	ImGui::PopStyleColor();
-
-	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + nameSize.x + 30, y));
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
 	ImGui::Text("=  %llu", value);
 
-	if (ImGui::BeginPopupContextItem(("copyuintvar_" + std::to_string(i)).c_str())) {
-		if (ImGui::Selectable("Copy value")) {
-			ImGui::SetClipboardText(std::to_string(value).c_str());
-		}
-		ImGui::EndPopup();
-	}
+	copyPopup(i, std::to_string(value), "uint");
 }
 
 void uClass::changeType(nodeType newType) {
@@ -253,7 +280,7 @@ void uClass::changeType(nodeType newType) {
 void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) {
 	auto node = this->nodes[i];
 	auto oldSize = node.size;
-	auto typeSize = typeSizes[newType];
+	auto typeSize = nodeData[newType].size;
 
 	nodes.erase(nodes.begin() + i);
 	nodes.insert(nodes.begin() + i, { (newType > node_hex64) ? ("Var_" + std::to_string(varCounter++)).c_str() : 0, newType, selectNew});
@@ -315,12 +342,7 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 	ImGui::PushStyleColor(ImGuiCol_Text, color.Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
-	if (ImGui::BeginPopupContextItem(("copyhex_" + std::to_string(i)).c_str())) {
-		if (ImGui::Selectable("Copy value")) {
-			ImGui::SetClipboardText(numText.c_str());
-		}
-		ImGui::EndPopup();
-	}
+	copyPopup(i, numText, "hex");
 
 	if (isPointer) {
 		ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
@@ -385,12 +407,7 @@ void uClass::drawDouble(int i, double num, int* pad) {
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
 
-	if (ImGui::BeginPopupContextItem(("copydouble_" + std::to_string(i)).c_str())) {
-		if (ImGui::Selectable("Copy value")) {
-			ImGui::SetClipboardText(toDraw.c_str());
-		}
-		ImGui::EndPopup();
-	}
+	copyPopup(i, toDraw, "dbl");
 }
 
 void uClass::drawFloat(int i, float num, int* pad) {
@@ -408,12 +425,7 @@ void uClass::drawFloat(int i, float num, int* pad) {
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
 
-	if (ImGui::BeginPopupContextItem(("copyfloat_" + std::to_string(i)).c_str())) {
-		if (ImGui::Selectable("Copy value")) {
-			ImGui::SetClipboardText(toDraw.c_str());
-		}
-		ImGui::EndPopup();
-	}
+	copyPopup(i, toDraw, "flt");
 }
 
 void uClass::drawNumber(int i, int64_t num, int* pad) {
@@ -428,12 +440,7 @@ void uClass::drawNumber(int i, int64_t num, int* pad) {
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
 
-	if (ImGui::BeginPopupContextItem(("copyint_" + std::to_string(i)).c_str())) {
-		if (ImGui::Selectable("Copy value")) {
-			ImGui::SetClipboardText(toDraw.c_str());
-		}
-		ImGui::EndPopup();
-	}
+	copyPopup(i, toDraw, "num");
 
 	*pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 }
@@ -570,6 +577,15 @@ void uClass::drawControllers(int i, int counter) {
 				changeType(node_uint8);
 			}
 
+			ImGui::Separator();
+
+			if (ImGui::Selectable("Float")) {
+				changeType(node_float);
+			}
+			if (ImGui::Selectable("Double")) {
+				changeType(node_double);
+			}
+
 			ImGui::EndMenu();
 		}
 
@@ -638,86 +654,83 @@ void uClass::drawNodes() {
 				int pad = 0;
 
 				// this kinda sucks
+				uintptr_t dataPos = (uintptr_t)data + counter;
 				switch (node.type) {
 				case node_hex8:
 					drawStringBytes(i, data, counter, 1);
 					drawBytes(i, data, counter, 1);
 
-					num = *(int8_t*)((uintptr_t)data + counter);
+					num = *(int8_t*)dataPos;
 					drawNumber(i, num, &pad);
 					drawHexNumber(i, num, pad);
-
-					counter += 1;
 					break;
 				case node_hex16:
 					drawStringBytes(i, data, counter, 2);
 					drawBytes(i, data, counter, 2);
 
-					num = *(int16_t*)((uintptr_t)data + counter);
+					num = *(int16_t*)dataPos;
 					drawNumber(i, num, &pad);
 					drawHexNumber(i, num, pad);
-
-					counter += 2;
 					break;
 				case node_hex32:
 					drawStringBytes(i, data, counter, 4);
 					drawBytes(i, data, counter, 4);
 
-					floatNum = *(float*)((uintptr_t)data + counter);
+					floatNum = *(float*)dataPos;
 					drawFloat(i, floatNum, &pad);
 
-					num = *(int32_t*)((uintptr_t)data + counter);
+					num = *(int32_t*)dataPos;
 					drawNumber(i, num, &pad);
 					drawHexNumber(i, num, pad);
-
-					counter += 4;
 					break;
 				case node_hex64:
 					drawStringBytes(i, data, counter, 8);
 					drawBytes(i, data, counter, 8);
 
-					doubleNum = *(double*)((uintptr_t)data + counter);
+					doubleNum = *(double*)dataPos;
 					drawDouble(i, doubleNum, &pad);
 
-					num = *(int64_t*)((uintptr_t)data + counter);
+					num = *(int64_t*)dataPos;
 					drawNumber(i, num, &pad);
 					drawHexNumber(i, num, pad);
-
-					counter += 8;
 					break;
 				case node_int64:
-					drawInteger(i, *(int64_t*)((uintptr_t)data + counter), node_int64);
-					counter += 8;
+					drawInteger(i, *(int64_t*)dataPos, node_int64);
 					break;
 				case node_int32:
-					drawInteger(i, *(int32_t*)((uintptr_t)data + counter), node_int32);
-					counter += 4;
+					drawInteger(i, *(int32_t*)dataPos, node_int32);
 					break;
 				case node_int16:
-					drawInteger(i, *(int16_t*)((uintptr_t)data + counter), node_int16);
-					counter += 2;
+					drawInteger(i, *(int16_t*)dataPos, node_int16);
 					break;
 				case node_int8:
-					drawInteger(i, *(int8_t*)((uintptr_t)data + counter), node_int8);
-					counter += 1;
+					drawInteger(i, *(int8_t*)dataPos, node_int8);
 					break;
 				case node_uint64:
-					drawUInteger(i, *(uint64_t*)((uintptr_t)data + counter), node_uint64);
-					counter += 8;
+					drawUInteger(i, *(uint64_t*)dataPos, node_uint64);
 					break;
 				case node_uint32:
-					drawUInteger(i, *(uint32_t*)((uintptr_t)data + counter), node_uint32);
-					counter += 4;
+					drawUInteger(i, *(uint32_t*)dataPos, node_uint32);
 					break;
 				case node_uint16:
-					drawUInteger(i, *(uint16_t*)((uintptr_t)data + counter), node_uint16);
-					counter += 2;
+					drawUInteger(i, *(uint16_t*)dataPos, node_uint16);
 					break;
 				case node_uint8:
-					drawUInteger(i, *(uint8_t*)((uintptr_t)data + counter), node_uint8);
-					counter += 1;
+					drawUInteger(i, *(uint8_t*)dataPos, node_uint8);
+					break;
+				case node_float:
+					drawFloat(i, *(float*)dataPos, node_float);
+					break;
+				case node_double:
+					drawDouble(i, *(double*)dataPos, node_double);
 					break;
 				}
+
+				if (node.type < 0 || node.type > node_double) {
+					continue;
+				}
+
+				counter += node.size;
 			}
 	}
 
