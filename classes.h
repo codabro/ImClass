@@ -446,9 +446,8 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 		}
 	}
 
-	std::string stringDraw = std::format("'{}'", (char*)buf.data);
-
 	if (isString) {
+		std::string stringDraw = std::format("'{}'", (char*)buf.data);
 		ImGui::SetCursorPos(ImVec2(455 + pad + textSize.x + 15, 10 + 12 * i));
 		ImGui::PushStyleColor(ImGuiCol_Text, ImColor(3, 252, 140).Value);
 		ImGui::Text(stringDraw.c_str());
@@ -709,114 +708,114 @@ void uClass::drawNodes() {
 	
 	ImGuiListClipper clipper;
 	clipper.Begin(nodes.size(), 12.0f);
-		while (clipper.Step()) {
-			size_t counter = 0;
-			for (int i = 0; i < clipper.DisplayStart; i++) {
-				auto& node = nodes[i];
-				counter += node.size;
+	while (clipper.Step()) {
+		size_t counter = 0;
+		for (int i = 0; i < clipper.DisplayStart; i++) {
+			auto& node = nodes[i];
+			counter += node.size;
+		}
+
+		for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+			auto& node = nodes[i];
+
+			drawControllers(i, counter);
+			drawOffset(i, counter);
+			drawAddress(i, counter);
+
+			size_t lCounter = 0;
+			uintptr_t num = 0;
+			float floatNum;
+			double doubleNum;
+			int pad = 0;
+
+			// this kinda sucks
+			uintptr_t dataPos = (uintptr_t)data + counter;
+			switch (node.type) {
+			case node_hex8:
+				drawStringBytes(i, data, counter, 1);
+				drawBytes(i, data, counter, 1);
+
+				num = *(int8_t*)dataPos;
+				drawNumber(i, num, &pad);
+				drawHexNumber(i, num, pad);
+				break;
+			case node_hex16:
+				drawStringBytes(i, data, counter, 2);
+				drawBytes(i, data, counter, 2);
+
+				num = *(int16_t*)dataPos;
+				drawNumber(i, num, &pad);
+				drawHexNumber(i, num, pad);
+				break;
+			case node_hex32:
+				drawStringBytes(i, data, counter, 4);
+				drawBytes(i, data, counter, 4);
+
+				floatNum = *(float*)dataPos;
+				drawFloat(i, floatNum, &pad);
+
+				num = *(int32_t*)dataPos;
+				drawNumber(i, num, &pad);
+				drawHexNumber(i, num, pad);
+				break;
+			case node_hex64:
+				drawStringBytes(i, data, counter, 8);
+				drawBytes(i, data, counter, 8);
+
+				doubleNum = *(double*)dataPos;
+				drawDouble(i, doubleNum, &pad);
+
+				num = *(int64_t*)dataPos;
+				drawNumber(i, num, &pad);
+				drawHexNumber(i, num, pad);
+				break;
+			case node_int64:
+				drawInteger(i, *(int64_t*)dataPos, node_int64);
+				break;
+			case node_int32:
+				drawInteger(i, *(int32_t*)dataPos, node_int32);
+				break;
+			case node_int16:
+				drawInteger(i, *(int16_t*)dataPos, node_int16);
+				break;
+			case node_int8:
+				drawInteger(i, *(int8_t*)dataPos, node_int8);
+				break;
+			case node_uint64:
+				drawUInteger(i, *(uint64_t*)dataPos, node_uint64);
+				break;
+			case node_uint32:
+				drawUInteger(i, *(uint32_t*)dataPos, node_uint32);
+				break;
+			case node_uint16:
+				drawUInteger(i, *(uint16_t*)dataPos, node_uint16);
+				break;
+			case node_uint8:
+				drawUInteger(i, *(uint8_t*)dataPos, node_uint8);
+				break;
+			case node_float:
+				drawFloat(i, *(float*)dataPos, node_float);
+				break;
+			case node_double:
+				drawDouble(i, *(double*)dataPos, node_double);
+				break;
+			case node_vector4:
+				drawVector4(i, *(Vector4*)dataPos, node_vector4);
+				break;
+			case node_vector3:
+				drawVector3(i, *(Vector3*)dataPos, node_vector3);
+				break;
+			case node_vector2:
+				drawVector2(i, *(Vector2*)dataPos, node_vector2);
+				break;
 			}
 
-			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-				auto& node = nodes[i];
-
-				drawControllers(i, counter);
-				drawOffset(i, counter);
-				drawAddress(i, counter);
-
-				size_t lCounter = 0;
-				uintptr_t num = 0;
-				float floatNum;
-				double doubleNum;
-				int pad = 0;
-
-				// this kinda sucks
-				uintptr_t dataPos = (uintptr_t)data + counter;
-				switch (node.type) {
-				case node_hex8:
-					drawStringBytes(i, data, counter, 1);
-					drawBytes(i, data, counter, 1);
-
-					num = *(int8_t*)dataPos;
-					drawNumber(i, num, &pad);
-					drawHexNumber(i, num, pad);
-					break;
-				case node_hex16:
-					drawStringBytes(i, data, counter, 2);
-					drawBytes(i, data, counter, 2);
-
-					num = *(int16_t*)dataPos;
-					drawNumber(i, num, &pad);
-					drawHexNumber(i, num, pad);
-					break;
-				case node_hex32:
-					drawStringBytes(i, data, counter, 4);
-					drawBytes(i, data, counter, 4);
-
-					floatNum = *(float*)dataPos;
-					drawFloat(i, floatNum, &pad);
-
-					num = *(int32_t*)dataPos;
-					drawNumber(i, num, &pad);
-					drawHexNumber(i, num, pad);
-					break;
-				case node_hex64:
-					drawStringBytes(i, data, counter, 8);
-					drawBytes(i, data, counter, 8);
-
-					doubleNum = *(double*)dataPos;
-					drawDouble(i, doubleNum, &pad);
-
-					num = *(int64_t*)dataPos;
-					drawNumber(i, num, &pad);
-					drawHexNumber(i, num, pad);
-					break;
-				case node_int64:
-					drawInteger(i, *(int64_t*)dataPos, node_int64);
-					break;
-				case node_int32:
-					drawInteger(i, *(int32_t*)dataPos, node_int32);
-					break;
-				case node_int16:
-					drawInteger(i, *(int16_t*)dataPos, node_int16);
-					break;
-				case node_int8:
-					drawInteger(i, *(int8_t*)dataPos, node_int8);
-					break;
-				case node_uint64:
-					drawUInteger(i, *(uint64_t*)dataPos, node_uint64);
-					break;
-				case node_uint32:
-					drawUInteger(i, *(uint32_t*)dataPos, node_uint32);
-					break;
-				case node_uint16:
-					drawUInteger(i, *(uint16_t*)dataPos, node_uint16);
-					break;
-				case node_uint8:
-					drawUInteger(i, *(uint8_t*)dataPos, node_uint8);
-					break;
-				case node_float:
-					drawFloat(i, *(float*)dataPos, node_float);
-					break;
-				case node_double:
-					drawDouble(i, *(double*)dataPos, node_double);
-					break;
-				case node_vector4:
-					drawVector4(i, *(Vector4*)dataPos, node_vector4);
-					break;
-				case node_vector3:
-					drawVector3(i, *(Vector3*)dataPos, node_vector3);
-					break;
-				case node_vector2:
-					drawVector2(i, *(Vector2*)dataPos, node_vector2);
-					break;
-				}
-
-				if (node.type < 0 || node.type >= node_max) {
-					continue;
-				}
-
-				counter += node.size;
+			if (node.type < 0 || node.type >= node_max) {
+				continue;
 			}
+
+			counter += node.size;
+		}
 	}
 
 	if (!g_HoveringPointer) {
