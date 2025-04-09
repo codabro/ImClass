@@ -27,6 +27,9 @@ enum nodeType {
 	node_vector4,
 	node_vector3,
 	node_vector2,
+	node_matrix4x4,
+	node_matrix3x4,
+	node_matrix3x3,
 	node_max
 };
 
@@ -40,6 +43,18 @@ struct Vector3 {
 
 struct Vector2 {
 	float x, y;
+};
+
+struct Matrix4x4 {
+	float m[4][4];
+};
+
+struct Matrix3x4 {
+	float m[3][4];
+};
+
+struct Matrix3x3 {
+	float m[3][3];
 };
 
 struct nodeTypeInfo {
@@ -67,6 +82,9 @@ nodeTypeInfo nodeData[] = {
 	{node_vector4, sizeof(Vector4), "Vector4", ImColor(115, 255, 124)},
 	{node_vector3, sizeof(Vector3), "Vector3", ImColor(115, 255, 124)},
 	{node_vector2, sizeof(Vector2), "Vector2", ImColor(115, 255, 124)},
+	{node_matrix4x4, sizeof(Matrix4x4), "Matrix4x4", ImColor(3, 252, 144)},
+	{node_matrix3x4, sizeof(Matrix3x4), "Matrix3x4", ImColor(3, 252, 144)},
+	{node_matrix3x3, sizeof(Matrix3x3), "Matrix3x3", ImColor(3, 252, 144)}
 };
 
 bool g_HoveringPointer = false;
@@ -151,9 +169,12 @@ public:
 	void drawUInteger(int i, uint64_t value, nodeType type);
 	void drawFloat(int i, float value, nodeType type);
 	void drawDouble(int i, double value, nodeType type);
-	void drawVector4(int i, Vector4 value, nodeType type);
-	void drawVector3(int i, Vector3 value, nodeType type);
-	void drawVector2(int i, Vector2 value, nodeType type);
+	void drawVector4(int i, Vector4& value, nodeType type);
+	void drawVector3(int i, Vector3& value, nodeType type);
+	void drawVector2(int i, Vector2& value, nodeType type);
+	void drawMatrix4x4(int i, Matrix4x4& value, nodeType type);
+	void drawMatrix3x4(int i, Matrix3x4& value, nodeType type);
+	void drawMatrix3x3(int i, Matrix3x3& value, nodeType type);
 };
 
 void uClass::sizeToNodes() {
@@ -247,7 +268,67 @@ int uClass::drawVariableName(int i, nodeType type) {
 	return typenameSize.x + nameSize.x;
 }
 
-void uClass::drawVector4(int i, Vector4 value, nodeType type) {
+void uClass::drawMatrix4x4(int i, Matrix4x4& value, nodeType type) {
+	auto& node = nodes[i];
+
+	int xPad = drawVariableName(i, type);
+	int mPad = 0;
+	int y = 0;
+
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			float val = value.m[i][j];
+			ImGui::SetCursorPos(ImVec2(180 + xPad + 30 + mPad, y));
+			ImGui::Text("%.3f", val);
+			mPad += 60;
+		}
+
+		y += 15;
+		mPad = 0;
+	}
+}
+
+void uClass::drawMatrix3x4(int i, Matrix3x4& value, nodeType type) {
+	auto& node = nodes[i];
+
+	int xPad = drawVariableName(i, type);
+	int mPad = 0;
+	int y = 0;
+
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 4; j++) {
+			float val = value.m[i][j];
+			ImGui::SetCursorPos(ImVec2(180 + xPad + 30 + mPad, y));
+			ImGui::Text("%.3f", val);
+			mPad += 60;
+		}
+
+		y += 15;
+		mPad = 0;
+	}
+}
+
+void uClass::drawMatrix3x3(int i, Matrix3x3& value, nodeType type) {
+	auto& node = nodes[i];
+
+	int xPad = drawVariableName(i, type);
+	int mPad = 0;
+	int y = 0;
+
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			float val = value.m[i][j];
+			ImGui::SetCursorPos(ImVec2(180 + xPad + 30 + mPad, y));
+			ImGui::Text("%.3f", val);
+			mPad += 60;
+		}
+
+		y += 15;
+		mPad = 0;
+	}
+}
+
+void uClass::drawVector4(int i, Vector4& value, nodeType type) {
 	auto& node = nodes[i];
 
 	int xPad = drawVariableName(i, type);
@@ -260,7 +341,7 @@ void uClass::drawVector4(int i, Vector4 value, nodeType type) {
 	copyPopup(i, vec, "vec4");
 }
 
-void uClass::drawVector3(int i, Vector3 value, nodeType type) {
+void uClass::drawVector3(int i, Vector3& value, nodeType type) {
 	auto& node = nodes[i];
 
 	int xPad = drawVariableName(i, type);
@@ -273,7 +354,7 @@ void uClass::drawVector3(int i, Vector3 value, nodeType type) {
 	copyPopup(i, vec, "vec3");
 }
 
-void uClass::drawVector2(int i, Vector2 value, nodeType type) {
+void uClass::drawVector2(int i, Vector2& value, nodeType type) {
 	auto& node = nodes[i];
 
 	int xPad = drawVariableName(i, type);
@@ -555,10 +636,10 @@ void uClass::drawControllers(int i, int counter) {
 	auto& node = nodes[i];
 
 	ImVec2 parentSize = ImGui::GetContentRegionAvail();
-	float h = parentSize.y + ImGui::GetCursorPosY();
+	float h = ImGui::GetCursorPosY() - 2;
 
 	ImGui::SetCursorPos(ImVec2(0, 0));
-	if (ImGui::Selectable(("##Controller_" + std::to_string(i)).c_str(), node.selected, 0, ImVec2(parentSize.x, h))) {
+	if (ImGui::Selectable(("##Controller_" + std::to_string(i) + std::to_string(h)).c_str(), node.selected, 0, ImVec2(parentSize.x, h))) {
 		if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
 			node.selected = !node.selected;
 		}
@@ -670,6 +751,18 @@ void uClass::drawControllers(int i, int counter) {
 				changeType(node_vector2);
 			}
 
+			ImGui::Separator();
+
+			if (ImGui::Selectable("Matrix4x4")) {
+				changeType(node_matrix4x4);
+			}
+			if (ImGui::Selectable("Matrix3x4")) {
+				changeType(node_matrix3x4);
+			}
+			if (ImGui::Selectable("Matrix3x3")) {
+				changeType(node_matrix3x3);
+			}
+
 			ImGui::EndMenu();
 		}
 
@@ -730,7 +823,7 @@ void uClass::drawNodes() {
 			auto& node = nodes[i];
 
 			ImVec2 startPos = ImGui::GetCursorPos();
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 1));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 			ImGui::BeginChild(("Node_" + std::to_string(i)).c_str(), ImVec2((this == g_PreviewClass) ? 1100 : parentSize.x, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_AlwaysUseWindowPadding);
 			ImGui::PopStyleVar();
 
@@ -822,6 +915,15 @@ void uClass::drawNodes() {
 				break;
 			case node_vector2:
 				drawVector2(i, *(Vector2*)dataPos, node_vector2);
+				break;
+			case node_matrix4x4:
+				drawMatrix4x4(i, *(Matrix4x4*)dataPos, node_matrix4x4);
+				break;
+			case node_matrix3x4:
+				drawMatrix3x4(i, *(Matrix3x4*)dataPos, node_matrix3x4);
+				break;
+			case node_matrix3x3:
+				drawMatrix3x3(i, *(Matrix3x3*)dataPos, node_matrix3x3);
 				break;
 			}
 
