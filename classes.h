@@ -70,6 +70,7 @@ nodeTypeInfo nodeData[] = {
 };
 
 bool g_HoveringPointer = false;
+bool g_InPopup = false;
 class uClass;
 uClass* g_PreviewClass = 0;
 
@@ -209,7 +210,15 @@ void uClass::resize(int mod) {
 }
 
 void uClass::copyPopup(int i, std::string toCopy, std::string id) {
-	if (ImGui::BeginPopupContextItem(("copyvar_" + id + std::to_string(i)).c_str())) {
+	std::string sID = "copyvar_" + id + std::to_string(i);
+
+	if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
+		g_InPopup = true;
+		ImGui::OpenPopup(sID.c_str());
+	}
+
+	if (ImGui::BeginPopup(sID.c_str())) {
+		g_InPopup = true;
 		if (ImGui::Selectable("Copy value")) {
 			ImGui::SetClipboardText(toCopy.c_str());
 		}
@@ -218,7 +227,6 @@ void uClass::copyPopup(int i, std::string toCopy, std::string id) {
 }
 
 int uClass::drawVariableName(int i, nodeType type) {
-	int y = 10 + 12 * i;
 	auto& node = nodes[i];
 	ImVec2 nameSize = ImGui::CalcTextSize(node.name);
 	
@@ -227,12 +235,12 @@ int uClass::drawVariableName(int i, nodeType type) {
 	ImVec2 typenameSize = ImGui::CalcTextSize(typeName);
 
 	ImGui::PushStyleColor(ImGuiCol_Text, data.color.Value);
-	ImGui::SetCursorPos(ImVec2(180, y));
+	ImGui::SetCursorPos(ImVec2(180, 0));
 	ImGui::Text(typeName);
 	ImGui::PopStyleColor();
 
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.9f, .9f, .9f, 1.f));
-	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + 15, y));
+	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + 15, 0));
 	ImGui::Text(node.name);
 	ImGui::PopStyleColor();
 
@@ -240,91 +248,84 @@ int uClass::drawVariableName(int i, nodeType type) {
 }
 
 void uClass::drawVector4(int i, Vector4 value, nodeType type) {
-	int y = 10 + 12 * i;
 	auto& node = nodes[i];
 
 	int xPad = drawVariableName(i, type);
 
 	std::string vec = std::format("{:.3f}, {:.3f}, {:.3f}, {:.3f}", value.x, value.y, value.z, value.w);
 	std::string toDraw = std::format("=  ({})", vec);
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
 	ImGui::Text(toDraw.c_str());
 
 	copyPopup(i, vec, "vec4");
 }
 
 void uClass::drawVector3(int i, Vector3 value, nodeType type) {
-	int y = 10 + 12 * i;
 	auto& node = nodes[i];
 
 	int xPad = drawVariableName(i, type);
 
 	std::string vec = std::format("{:.3f}, {:.3f}, {:.3f}", value.x, value.y, value.z);
 	std::string toDraw = std::format("=  ({})", vec);
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
 	ImGui::Text(toDraw.c_str());
 
 	copyPopup(i, vec, "vec3");
 }
 
 void uClass::drawVector2(int i, Vector2 value, nodeType type) {
-	int y = 10 + 12 * i;
 	auto& node = nodes[i];
 
 	int xPad = drawVariableName(i, type);
 
 	std::string vec = std::format("{:.3f}, {:.3f}", value.x, value.y);
 	std::string toDraw = std::format("=  ({})", vec);
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
 	ImGui::Text(toDraw.c_str());
 
 	copyPopup(i, vec, "vec2");
 }
 
 void uClass::drawFloat(int i, float value, nodeType type) {
-	int y = 10 + 12 * i;
 	auto& node = nodes[i];
 
 	int xPad = drawVariableName(i, type);
 
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
 	ImGui::Text("=  %.3f", value);
 
 	copyPopup(i, std::to_string(value), "float");
 }
 
 void uClass::drawDouble(int i, double value, nodeType type) {
-	int y = 10 + 12 * i;
 	auto& node = nodes[i];
 
 	int xPad = drawVariableName(i, type);
 
 	std::string toDraw = std::format("=  {:.6f}", value);
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
 	ImGui::Text(toDraw.c_str());
 
 	copyPopup(i, std::to_string(value), "double");
 }
 
 void uClass::drawInteger(int i, int64_t value, nodeType type) {
-	int y = 10 + 12 * i;
 	auto& node = nodes[i];
 	
 	int xPad = drawVariableName(i, type);
 
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
 	ImGui::Text("=  %lld", value);
 
 	copyPopup(i, std::to_string(value), "int");
 }
 
 void uClass::drawUInteger(int i, uint64_t value, nodeType type) {
-	int y = 10 + 12 * i;
 	auto& node = nodes[i];
 
 	int xPad = drawVariableName(i, type);
 
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, y));
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
 	ImGui::Text("=  %llu", value);
 
 	copyPopup(i, std::to_string(value), "uint");
@@ -402,7 +403,7 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 
 	ImVec2 textSize = ImGui::CalcTextSize(toDraw.c_str());
 
-	ImGui::SetCursorPos(ImVec2(455 + pad, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(455 + pad, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, color.Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
@@ -448,7 +449,7 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 
 	if (isString) {
 		std::string stringDraw = std::format("'{}'", (char*)buf.data);
-		ImGui::SetCursorPos(ImVec2(455 + pad + textSize.x + 15, 10 + 12 * i));
+		ImGui::SetCursorPos(ImVec2(455 + pad + textSize.x + 15, 0));
 		ImGui::PushStyleColor(ImGuiCol_Text, ImColor(3, 252, 140).Value);
 		ImGui::Text(stringDraw.c_str());
 		ImGui::PopStyleColor();
@@ -465,7 +466,7 @@ void uClass::drawDouble(int i, double num, int* pad) {
 		*pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 	}
 
-	ImGui::SetCursorPos(ImVec2(455, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(455, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
@@ -483,7 +484,7 @@ void uClass::drawFloat(int i, float num, int* pad) {
 		*pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 	}
 
-	ImGui::SetCursorPos(ImVec2(455, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(455, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
@@ -498,7 +499,7 @@ void uClass::drawNumber(int i, int64_t num, int* pad) {
 
 	std::string toDraw = std::to_string(num);
 
-	ImGui::SetCursorPos(ImVec2(455 + *pad, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(455 + *pad, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 218, 133).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
@@ -509,14 +510,14 @@ void uClass::drawNumber(int i, int64_t num, int* pad) {
 }
 
 void uClass::drawOffset(int i, int pos) {
-	ImGui::SetCursorPos(ImVec2(0, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(0, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.9f, .9f, .9f, 1.f));
 	ImGui::Text(ui::toHexString(pos, 4).c_str());
 	ImGui::PopStyleColor();
 }
 
 void uClass::drawAddress(int i, int pos) {
-	ImGui::SetCursorPos(ImVec2(50, 10 + 12 * i));
+	ImGui::SetCursorPos(ImVec2(50, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.7f, .7f, .7f, 1.f));
 	ImGui::Text(ui::toHexString(this->address + pos, 16).c_str());
 	ImGui::PopStyleColor();
@@ -525,7 +526,7 @@ void uClass::drawAddress(int i, int pos) {
 void uClass::drawBytes(int i, BYTE* data, int pos, int size) {
 	for (int j = 0; j < size; j++) {
 		BYTE byte = data[pos];
-		ImGui::SetCursorPos(ImVec2(285 + j * 20, 10 + i * 12));
+		ImGui::SetCursorPos(ImVec2(285 + j * 20, 0));
 		ImGui::Text(ui::toHexString(byte, 2).c_str());
 		pos++;
 	}
@@ -534,7 +535,7 @@ void uClass::drawBytes(int i, BYTE* data, int pos, int size) {
 void uClass::drawStringBytes(int i, BYTE* data, int pos, int size) {
 	for (int j = 0; j < size; j++) {
 		BYTE byte = data[pos];
-		ImGui::SetCursorPos(ImVec2(180 + j * 12, 10 + i * 12));
+		ImGui::SetCursorPos(ImVec2(180 + j * 12, 0));
 		if (byte > 32 && byte < 127) {
 			ImGui::Text("%c", byte);
 		}
@@ -553,8 +554,11 @@ void uClass::drawStringBytes(int i, BYTE* data, int pos, int size) {
 void uClass::drawControllers(int i, int counter) {
 	auto& node = nodes[i];
 
-	ImGui::SetCursorPos(ImVec2(0, 14 + i * 12));
-	if (ImGui::Selectable(("##Controller_" + std::to_string(i)).c_str(), node.selected, 0, ImVec2(0, 6))) {
+	ImVec2 parentSize = ImGui::GetContentRegionAvail();
+	float h = parentSize.y + ImGui::GetCursorPosY();
+
+	ImGui::SetCursorPos(ImVec2(0, 0));
+	if (ImGui::Selectable(("##Controller_" + std::to_string(i)).c_str(), node.selected, 0, ImVec2(parentSize.x, h))) {
 		if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
 			node.selected = !node.selected;
 		}
@@ -587,7 +591,12 @@ void uClass::drawControllers(int i, int counter) {
 		}
 	}
 
-	if (ImGui::BeginPopupContextItem(("##NodePopup_" + std::to_string(i)).c_str())) {
+	std::string sID = "##NodePopup_" + std::to_string(i);
+	if (!g_InPopup && ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
+		ImGui::OpenPopup(sID.c_str());
+	}
+
+	if (ImGui::BeginPopup(sID.c_str())) {
 		if (!node.selected) {
 			for (int j = 0; j < nodes.size(); j++) {
 				nodes[j].selected = false;
@@ -705,9 +714,11 @@ void uClass::drawControllers(int i, int counter) {
 
 void uClass::drawNodes() {
 	mem::read(this->address, this->data, this->size);
-	
+
+	ImVec2 parentSize = ImGui::GetContentRegionAvail();
+
 	ImGuiListClipper clipper;
-	clipper.Begin(nodes.size(), 12.0f);
+	clipper.Begin(nodes.size());
 	while (clipper.Step()) {
 		size_t counter = 0;
 		for (int i = 0; i < clipper.DisplayStart; i++) {
@@ -718,7 +729,11 @@ void uClass::drawNodes() {
 		for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
 			auto& node = nodes[i];
 
-			drawControllers(i, counter);
+			ImVec2 startPos = ImGui::GetCursorPos();
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 1));
+			ImGui::BeginChild(("Node_" + std::to_string(i)).c_str(), ImVec2((this == g_PreviewClass) ? 1100 : parentSize.x, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_AlwaysUseWindowPadding);
+			ImGui::PopStyleVar();
+
 			drawOffset(i, counter);
 			drawAddress(i, counter);
 
@@ -809,6 +824,12 @@ void uClass::drawNodes() {
 				drawVector2(i, *(Vector2*)dataPos, node_vector2);
 				break;
 			}
+
+			drawControllers(i, counter);
+
+			ImGui::EndChild();
+
+			ImVec2 endPos = ImGui::GetCursorPos();
 
 			if (node.type < 0 || node.type >= node_max) {
 				continue;

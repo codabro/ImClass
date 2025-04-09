@@ -152,6 +152,7 @@ void ui::renderMain() {
 
         ImGui::BeginChild("MemView", ImVec2(0, 0), 0, g_HoveringPointer? ImGuiWindowFlags_NoScrollWithMouse : 0);
         g_HoveringPointer = false;
+        g_InPopup = false;
         //auto buf = Read<readBuf<4096>>(sClass.address);
         sClass.drawNodes();
         ImGui::EndChild();
@@ -226,6 +227,9 @@ void ui::init(HWND hwnd) {
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 0.0f;
     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    style.Colors[ImGuiCol_Header] = ImColor(66, 135, 245, 75);
+    style.Colors[ImGuiCol_HeaderActive] = ImColor(66, 135, 245, 75);
+    style.Colors[ImGuiCol_HeaderHovered] = ImColor(66, 135, 245, 50);
 
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
