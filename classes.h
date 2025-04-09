@@ -167,14 +167,14 @@ public:
 	void copyPopup(int i, std::string toCopy, std::string id);
 	void drawInteger(int i, int64_t value, nodeType type);
 	void drawUInteger(int i, uint64_t value, nodeType type);
-	void drawFloat(int i, float value, nodeType type);
-	void drawDouble(int i, double value, nodeType type);
-	void drawVector4(int i, Vector4& value, nodeType type);
-	void drawVector3(int i, Vector3& value, nodeType type);
-	void drawVector2(int i, Vector2& value, nodeType type);
-	void drawMatrix4x4(int i, Matrix4x4& value, nodeType type);
-	void drawMatrix3x4(int i, Matrix3x4& value, nodeType type);
-	void drawMatrix3x3(int i, Matrix3x3& value, nodeType type);
+	void drawFloatVar(int i, float value);
+	void drawDoubleVar(int i, double value);
+	void drawVector4(int i, Vector4& value);
+	void drawVector3(int i, Vector3& value);
+	void drawVector2(int i, Vector2& value);
+	void drawMatrix4x4(int i, Matrix4x4& value);
+	void drawMatrix3x4(int i, Matrix3x4& value);
+	void drawMatrix3x3(int i, Matrix3x3& value);
 };
 
 void uClass::sizeToNodes() {
@@ -268,10 +268,10 @@ int uClass::drawVariableName(int i, nodeType type) {
 	return typenameSize.x + nameSize.x;
 }
 
-void uClass::drawMatrix4x4(int i, Matrix4x4& value, nodeType type) {
+void uClass::drawMatrix4x4(int i, Matrix4x4& value) {
 	auto& node = nodes[i];
 
-	int xPad = drawVariableName(i, type);
+	int xPad = drawVariableName(i, node_matrix4x4);
 	int mPad = 0;
 	int y = 0;
 
@@ -288,10 +288,10 @@ void uClass::drawMatrix4x4(int i, Matrix4x4& value, nodeType type) {
 	}
 }
 
-void uClass::drawMatrix3x4(int i, Matrix3x4& value, nodeType type) {
+void uClass::drawMatrix3x4(int i, Matrix3x4& value) {
 	auto& node = nodes[i];
 
-	int xPad = drawVariableName(i, type);
+	int xPad = drawVariableName(i, node_matrix3x4);
 	int mPad = 0;
 	int y = 0;
 
@@ -308,10 +308,10 @@ void uClass::drawMatrix3x4(int i, Matrix3x4& value, nodeType type) {
 	}
 }
 
-void uClass::drawMatrix3x3(int i, Matrix3x3& value, nodeType type) {
+void uClass::drawMatrix3x3(int i, Matrix3x3& value) {
 	auto& node = nodes[i];
 
-	int xPad = drawVariableName(i, type);
+	int xPad = drawVariableName(i, node_matrix3x3);
 	int mPad = 0;
 	int y = 0;
 
@@ -328,10 +328,10 @@ void uClass::drawMatrix3x3(int i, Matrix3x3& value, nodeType type) {
 	}
 }
 
-void uClass::drawVector4(int i, Vector4& value, nodeType type) {
+void uClass::drawVector4(int i, Vector4& value) {
 	auto& node = nodes[i];
 
-	int xPad = drawVariableName(i, type);
+	int xPad = drawVariableName(i, node_vector4);
 
 	std::string vec = std::format("{:.3f}, {:.3f}, {:.3f}, {:.3f}", value.x, value.y, value.z, value.w);
 	std::string toDraw = std::format("=  ({})", vec);
@@ -341,10 +341,10 @@ void uClass::drawVector4(int i, Vector4& value, nodeType type) {
 	copyPopup(i, vec, "vec4");
 }
 
-void uClass::drawVector3(int i, Vector3& value, nodeType type) {
+void uClass::drawVector3(int i, Vector3& value) {
 	auto& node = nodes[i];
 
-	int xPad = drawVariableName(i, type);
+	int xPad = drawVariableName(i, node_vector3);
 
 	std::string vec = std::format("{:.3f}, {:.3f}, {:.3f}", value.x, value.y, value.z);
 	std::string toDraw = std::format("=  ({})", vec);
@@ -354,10 +354,10 @@ void uClass::drawVector3(int i, Vector3& value, nodeType type) {
 	copyPopup(i, vec, "vec3");
 }
 
-void uClass::drawVector2(int i, Vector2& value, nodeType type) {
+void uClass::drawVector2(int i, Vector2& value) {
 	auto& node = nodes[i];
 
-	int xPad = drawVariableName(i, type);
+	int xPad = drawVariableName(i, node_vector2);
 
 	std::string vec = std::format("{:.3f}, {:.3f}", value.x, value.y);
 	std::string toDraw = std::format("=  ({})", vec);
@@ -367,10 +367,10 @@ void uClass::drawVector2(int i, Vector2& value, nodeType type) {
 	copyPopup(i, vec, "vec2");
 }
 
-void uClass::drawFloat(int i, float value, nodeType type) {
+void uClass::drawFloatVar(int i, float value) {
 	auto& node = nodes[i];
 
-	int xPad = drawVariableName(i, type);
+	int xPad = drawVariableName(i, node_float);
 
 	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
 	ImGui::Text("=  %.3f", value);
@@ -378,10 +378,10 @@ void uClass::drawFloat(int i, float value, nodeType type) {
 	copyPopup(i, std::to_string(value), "float");
 }
 
-void uClass::drawDouble(int i, double value, nodeType type) {
+void uClass::drawDoubleVar(int i, double value) {
 	auto& node = nodes[i];
 
-	int xPad = drawVariableName(i, type);
+	int xPad = drawVariableName(i, node_double);
 
 	std::string toDraw = std::format("=  {:.6f}", value);
 	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
@@ -902,28 +902,28 @@ void uClass::drawNodes() {
 				drawUInteger(i, *(uint8_t*)dataPos, node_uint8);
 				break;
 			case node_float:
-				drawFloat(i, *(float*)dataPos, node_float);
+				drawFloatVar(i, *(float*)dataPos);
 				break;
 			case node_double:
-				drawDouble(i, *(double*)dataPos, node_double);
+				drawDoubleVar(i, *(double*)dataPos);
 				break;
 			case node_vector4:
-				drawVector4(i, *(Vector4*)dataPos, node_vector4);
+				drawVector4(i, *(Vector4*)dataPos);
 				break;
 			case node_vector3:
-				drawVector3(i, *(Vector3*)dataPos, node_vector3);
+				drawVector3(i, *(Vector3*)dataPos);
 				break;
 			case node_vector2:
-				drawVector2(i, *(Vector2*)dataPos, node_vector2);
+				drawVector2(i, *(Vector2*)dataPos);
 				break;
 			case node_matrix4x4:
-				drawMatrix4x4(i, *(Matrix4x4*)dataPos, node_matrix4x4);
+				drawMatrix4x4(i, *(Matrix4x4*)dataPos);
 				break;
 			case node_matrix3x4:
-				drawMatrix3x4(i, *(Matrix3x4*)dataPos, node_matrix3x4);
+				drawMatrix3x4(i, *(Matrix3x4*)dataPos);
 				break;
 			case node_matrix3x3:
-				drawMatrix3x3(i, *(Matrix3x3*)dataPos, node_matrix3x3);
+				drawMatrix3x3(i, *(Matrix3x3*)dataPos);
 				break;
 			}
 
