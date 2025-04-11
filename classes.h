@@ -277,7 +277,7 @@ void uClass::drawBool(int i, bool value) {
 	int xPad = drawVariableName(i, node_bool);
 
 	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
-	ImGui::Text(value ? "true" : "false");
+	ImGui::Text(value ? "=  true" : "=  false");
 }
 
 void uClass::drawMatrix4x4(int i, Matrix4x4& value) {
