@@ -263,9 +263,34 @@ int uClass::drawVariableName(int i, nodeType type) {
 	ImGui::Text(typeName);
 	ImGui::PopStyleColor();
 
+	static char renameBuf[64] = { 0 };
+	static int renamedNode = -1;
+
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.9f, .9f, .9f, 1.f));
 	ImGui::SetCursorPos(ImVec2(180 + typenameSize.x + 15, 0));
-	ImGui::Text(node.name);
+	if (renamedNode != i) {
+		ImGui::Text(node.name);
+
+		if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+			renamedNode = i;
+			memcpy(renameBuf, node.name, sizeof(renameBuf));
+		}
+	}
+	else {
+		ImGui::SetKeyboardFocusHere();
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 1));
+		ImGui::SetNextItemWidth(200);
+		nameSize.x = 200;
+		if (ImGui::InputText("##RenameNode", renameBuf, sizeof(renameBuf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+			memcpy(node.name, renameBuf, sizeof(renameBuf));
+			renamedNode = -1;
+		}
+		ImGui::PopStyleVar();
+
+		if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+			renamedNode = -1;
+		}
+	}
 	ImGui::PopStyleColor();
 
 	return typenameSize.x + nameSize.x;
