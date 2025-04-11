@@ -174,7 +174,7 @@ void ui::renderMain() {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Tools")) {
-            if (ImGui::Button("Signature Scanner"))
+            if (ImGui::MenuItem("Signature Scanner"))
             {
                 sigScanWindow = true;
             }
