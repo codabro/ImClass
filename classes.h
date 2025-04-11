@@ -30,6 +30,7 @@ enum nodeType {
 	node_matrix4x4,
 	node_matrix3x4,
 	node_matrix3x3,
+	node_bool,
 	node_max
 };
 
@@ -84,7 +85,8 @@ nodeTypeInfo nodeData[] = {
 	{node_vector2, sizeof(Vector2), "Vector2", ImColor(115, 255, 124)},
 	{node_matrix4x4, sizeof(Matrix4x4), "Matrix4x4", ImColor(3, 252, 144)},
 	{node_matrix3x4, sizeof(Matrix3x4), "Matrix3x4", ImColor(3, 252, 144)},
-	{node_matrix3x3, sizeof(Matrix3x3), "Matrix3x3", ImColor(3, 252, 144)}
+	{node_matrix3x3, sizeof(Matrix3x3), "Matrix3x3", ImColor(3, 252, 144)},
+	{node_bool, sizeof(bool), "Bool", ImColor(0, 183, 255) }
 };
 
 bool g_HoveringPointer = false;
@@ -175,6 +177,7 @@ public:
 	void drawMatrix4x4(int i, Matrix4x4& value);
 	void drawMatrix3x4(int i, Matrix3x4& value);
 	void drawMatrix3x3(int i, Matrix3x3& value);
+	void drawBool(int i, bool value);
 };
 
 void uClass::sizeToNodes() {
@@ -266,6 +269,15 @@ int uClass::drawVariableName(int i, nodeType type) {
 	ImGui::PopStyleColor();
 
 	return typenameSize.x + nameSize.x;
+}
+
+void uClass::drawBool(int i, bool value) {
+	auto& node = nodes[i];
+
+	int xPad = drawVariableName(i, node_bool);
+
+	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
+	ImGui::Text(value ? "true" : "false");
 }
 
 void uClass::drawMatrix4x4(int i, Matrix4x4& value) {
@@ -738,6 +750,9 @@ void uClass::drawControllers(int i, int counter) {
 			if (ImGui::Selectable("Double")) {
 				changeType(node_double);
 			}
+			if (ImGui::Selectable("Bool")) {
+				changeType(node_bool);
+			}
 
 			ImGui::Separator();
 
@@ -924,6 +939,9 @@ void uClass::drawNodes() {
 				break;
 			case node_matrix3x3:
 				drawMatrix3x3(i, *(Matrix3x3*)dataPos);
+				break;
+			case node_bool:
+				drawBool(i, *(bool*)dataPos);
 				break;
 			}
 
