@@ -233,6 +233,8 @@ void ui::renderMain() {
         ImGui::SetCursorPos(ImVec2(columnOffset - 58, wndSize.y - 80));
         if (ImGui::Button("-")) {
             if (g_Classes.size() > 0) {
+                uClass& sClass = g_Classes[selectedClass];
+                free(sClass.data);
                 g_Classes.erase(g_Classes.begin() + selectedClass);
                 if (selectedClass > 0 && selectedClass > g_Classes.size() - 1) {
                     selectedClass--;
@@ -278,6 +280,7 @@ void ui::renderMain() {
 
         ImGui::BeginChild("MemView", ImVec2(0, 0), 0, g_HoveringPointer? ImGuiWindowFlags_NoScrollWithMouse : 0);
         g_HoveringPointer = false;
+        g_InPopup = false;
         //auto buf = Read<readBuf<4096>>(sClass.address);
         sClass.drawNodes();
         ImGui::EndChild();
@@ -354,6 +357,9 @@ void ui::init(HWND hwnd) {
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 0.0f;
     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    style.Colors[ImGuiCol_Header] = ImColor(66, 135, 245, 75);
+    style.Colors[ImGuiCol_HeaderActive] = ImColor(66, 135, 245, 75);
+    style.Colors[ImGuiCol_HeaderHovered] = ImColor(66, 135, 245, 50);
 
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
