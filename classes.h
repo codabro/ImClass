@@ -91,8 +91,6 @@ nodeTypeInfo nodeData[] = {
 
 bool g_HoveringPointer = false;
 bool g_InPopup = false;
-class uClass;
-uClass* g_PreviewClass = 0;
 
 class nodeBase {
 public:
@@ -125,7 +123,7 @@ public:
 	size_t size;
 	BYTE* data = 0;
 
-	uClass(int nodeCount) {
+	uClass(int nodeCount, bool incrementCounter = true) {
 		size = 0;
 
 		for (int i = 0; i < nodeCount; i++) {
@@ -137,7 +135,7 @@ public:
 		memset(addressInput, 0, sizeof(addressInput));
 		addressInput[0] = '0';
 
-		std::string newName = "Class_" + std::to_string(nameCounter++);
+		std::string newName = "Class_" + std::to_string(nameCounter);
 		memcpy(name, newName.data(), newName.size());
 
 		data = (BYTE*)malloc(size);
@@ -147,6 +145,10 @@ public:
 		}
 		else {
 			MessageBoxA(0, "Failed to allocate memory!", "ERROR", MB_ICONERROR);
+		}
+
+		if (incrementCounter) {
+			nameCounter++;
 		}
 	}
 
@@ -179,6 +181,8 @@ public:
 	void drawMatrix3x3(int i, Matrix3x3& value);
 	void drawBool(int i, bool value);
 };
+
+uClass g_PreviewClass(15);
 
 void uClass::sizeToNodes() {
 	size_t szNodes = 0;
@@ -535,21 +539,17 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 
 		if (ImGui::BeginItemTooltip()) {
 			ImGui::BeginChild("MemPreview_Child", ImVec2(0, 0), ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
-			if (!g_PreviewClass) {
-				g_PreviewClass = new uClass(15);
-
-			}
 
 			float mWheel = ImGui::GetIO().MouseWheel;
 			if (mWheel > 0) {
-				g_PreviewClass->resize(-8);
+				g_PreviewClass.resize(-8);
 			}
 			else if (mWheel < 0) {
-				g_PreviewClass->resize(8);
+				g_PreviewClass.resize(8);
 			}
 
-			g_PreviewClass->address = num;
-			g_PreviewClass->drawNodes();
+			g_PreviewClass.address = num;
+			g_PreviewClass.drawNodes();
 
 			ImGui::EndChild();
 			ImGui::EndTooltip();
@@ -864,7 +864,7 @@ void uClass::drawNodes() {
 
 			ImVec2 startPos = ImGui::GetCursorPos();
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-			ImGui::BeginChild(("Node_" + std::to_string(i)).c_str(), ImVec2((this == g_PreviewClass) ? 1100 : parentSize.x, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_AlwaysUseWindowPadding);
+			ImGui::BeginChild(("Node_" + std::to_string(i)).c_str(), ImVec2((this == &g_PreviewClass) ? 1100 : parentSize.x, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_AlwaysUseWindowPadding);
 			ImGui::PopStyleVar();
 
 			drawOffset(i, counter);
@@ -984,13 +984,12 @@ void uClass::drawNodes() {
 		}
 	}
 
-	if (!g_HoveringPointer) {
-		if (g_PreviewClass) {
-			free(g_PreviewClass->data);
-			delete g_PreviewClass;
-			g_PreviewClass = 0;
-		}
+	static bool oHoveringPointer = false;
+	if (oHoveringPointer && !g_HoveringPointer) {
+		free(g_PreviewClass.data);
+		g_PreviewClass = uClass(15, false);
 	}
+	oHoveringPointer = g_HoveringPointer;
 }
 
 std::vector<uClass> g_Classes = { uClass(50) };
