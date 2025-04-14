@@ -205,6 +205,23 @@ void ui::renderMain() {
                     updateAddressBox(addressInput, lClass.addressInput);
                 }
 
+                if (ImGui::BeginPopupContextItem(("##ClassContext" + std::to_string(i)).c_str())) {
+                    if (ImGui::MenuItem("New Class")) {
+                        g_Classes.push_back({ uClass(50) });
+                    }
+                    if (ImGui::MenuItem("Delete")) {
+                        if (g_Classes.size() > 0) {
+                            uClass& sClass = g_Classes[i];
+                            free(sClass.data);
+                            g_Classes.erase(g_Classes.begin() + i);
+                            if (selectedClass > 0 && selectedClass > g_Classes.size() - 1) {
+                                selectedClass--;
+                            }
+                        }
+                    }
+                    ImGui::EndPopup();
+                }
+
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                     renamedClass = i;
                     memset(renameBuf, 0, sizeof(renameBuf));
@@ -225,30 +242,18 @@ void ui::renderMain() {
             }
         }
 
-        ImGui::SetCursorPos(ImVec2(columnOffset - 37, wndSize.y - 80));
-        if (ImGui::Button("+")) {
-            g_Classes.push_back({ uClass(50) });
-        }
-
-        ImGui::SetCursorPos(ImVec2(columnOffset - 58, wndSize.y - 80));
-        if (ImGui::Button("-")) {
-            if (g_Classes.size() > 0) {
-                uClass& sClass = g_Classes[selectedClass];
-                free(sClass.data);
-                g_Classes.erase(g_Classes.begin() + selectedClass);
-                if (selectedClass > 0 && selectedClass > g_Classes.size() - 1) {
-                    selectedClass--;
-                }
-            }
-        }
+        ImGui::EndChild();
 
         if (g_Classes.empty()) {
-            ImGui::EndChild();
+            if (ImGui::BeginPopupContextItem("##ClassesContext")) {
+                if (ImGui::MenuItem("New Class")) {
+                    g_Classes.push_back({ uClass(50) });
+                }
+                ImGui::EndPopup();
+            }
             ImGui::End();
             return;
         }
-
-        ImGui::EndChild();
 
         uClass& sClass = g_Classes[selectedClass];
 
@@ -261,7 +266,6 @@ void ui::renderMain() {
             updateAddress(newAddress, &sClass.address);
             updateAddressBox(sClass.addressInput, addressInput);
         }
-
 
         static bool oInputFocused = false;
 
