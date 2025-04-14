@@ -14,6 +14,8 @@ namespace ui {
     bool processWindow = false;
     bool signaturesWindow = false;
     bool sigScanWindow = false;
+    bool exportWindow = false;
+    std::string exportedClass;
     inline std::optional<PatternScanResult> patternResults;
     char addressInput[256] = "0";
 	char module[512] = { 0 };
@@ -27,6 +29,7 @@ namespace ui {
     void init(HWND hwnd);
 	void renderProcessWindow();
 	void renderMain();
+    void renderExportWindow();
 	void render();
     bool searchMatches(std::string str, std::string term);
     uintptr_t toAddress(std::string address);
@@ -206,6 +209,12 @@ void ui::renderMain() {
                 }
 
                 if (ImGui::BeginPopupContextItem(("##ClassContext" + std::to_string(i)).c_str())) {
+                    if (ImGui::MenuItem("Export Class")) {
+                        uClass& sClass = g_Classes[i];
+                        std::string exported = sClass.exportClass();
+                        exportedClass = exported;
+                        exportWindow = true;
+                    }
                     if (ImGui::MenuItem("New Class")) {
                         g_Classes.push_back({ uClass(50) });
                     }
@@ -336,6 +345,20 @@ void ui::renderProcessWindow() {
     ImGui::End();
 }
 
+void ui::renderExportWindow() {
+    if (!exportWindow) {
+        return;
+    }
+
+    ImGui::SetNextWindowSize(ImVec2(437, 305));
+    ImGui::Begin("Exported class", &exportWindow, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::InputTextMultiline("##exportedclass", exportedClass.data(), exportedClass.size(), ImVec2(420, 250));
+    if (ImGui::Button("Copy")) {
+        ImGui::SetClipboardText(exportedClass.c_str());
+    }
+    ImGui::End();
+}
+
 bool ui::searchMatches(std::string str, std::string term) {
     std::transform(str.begin(), str.end(), str.begin(), tolower);
     std::transform(term.begin(), term.end(), term.begin(), tolower);
@@ -345,6 +368,7 @@ bool ui::searchMatches(std::string str, std::string term) {
 void ui::render() {
     renderMain();
     renderProcessWindow();
+    renderExportWindow();
     renderSignatureScan();
     renderSignatureResults();    
 }
