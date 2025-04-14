@@ -3,6 +3,8 @@
 #include <Windows.h>
 #include <vector>
 #include <tlhelp32.h>
+#include <unordered_map>
+#include <Psapi.h>
 
 struct processSnapshot {
     std::wstring name;
@@ -49,11 +51,18 @@ struct TypeDescriptor {
     char name[60];
 };
 
+struct funcExport
+{
+	std::string name;
+	uintptr_t address;
+};
+
 namespace mem {
     std::vector<processSnapshot> processes;
     HANDLE memHandle;
     DWORD pid;
     std::vector<moduleInfo> moduleList;
+    std::unordered_map<uintptr_t, std::string> g_ExportMap;
     bool x32 = false;
 
     bool getProcessList();
@@ -63,6 +72,8 @@ namespace mem {
     void getSections(moduleInfo& info, std::vector<moduleSection>& dest);
     bool isPointer(uintptr_t address, pointerInfo* info);
     bool rttiInfo(uintptr_t address, std::string& out);
+    std::vector<funcExport> gatherRemoteExports(const std::string& modulePath, uintptr_t remoteBaseAddress);
+    void gatherExports();
 
     bool read(uintptr_t address, void* buf, uintptr_t size);
     bool write(uintptr_t address, const void* buf, uintptr_t size);
@@ -268,6 +279,123 @@ bool mem::initProcess(const wchar_t* processName) {
     }
 
     return false;
+}
+
+LPVOID mapDllFromDisk(const std::string& dllPath, DWORD& outSize)
+{
+	HANDLE hFile = CreateFileA(dllPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	if (hFile == INVALID_HANDLE_VALUE)
+	{
+	#ifdef _DEBUG
+		std::cerr << "CreateFile failed for " << dllPath << "\n";
+	#endif
+		return nullptr;
+	}
+
+	outSize = GetFileSize(hFile, NULL);
+	if (outSize == INVALID_FILE_SIZE)
+	{
+		CloseHandle(hFile);
+		return nullptr;
+	}
+
+	HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+	if (!hMapping)
+	{
+		CloseHandle(hFile);
+		return nullptr;
+	}
+
+	LPVOID mappedBase = MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0);
+	CloseHandle(hMapping);
+	CloseHandle(hFile);
+
+	return mappedBase;
+}
+
+std::vector<funcExport> mem::gatherRemoteExports(const std::string& modulePath, uintptr_t remoteBaseAddress)
+{
+	std::vector<funcExport> exports;
+	DWORD mappedSize = 0;
+
+	LPVOID mappedBase = mapDllFromDisk(modulePath, mappedSize);
+	if (!mappedBase) {
+		return exports;
+	}
+
+	auto dosHeader = (PIMAGE_DOS_HEADER)(mappedBase);
+	if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE) {
+		UnmapViewOfFile(mappedBase);
+		return exports;
+	}
+
+	auto ntHeader = (PIMAGE_NT_HEADERS)((std::uint8_t*)(mappedBase)+dosHeader->e_lfanew);
+	if (ntHeader->Signature != IMAGE_NT_SIGNATURE) {
+		UnmapViewOfFile(mappedBase);
+		return exports;
+	}
+
+	DWORD exportDirRVA = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+	DWORD exportDirSize = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+
+	if (!exportDirRVA || !exportDirSize) {
+		UnmapViewOfFile(mappedBase);
+		return exports;
+	}
+
+	auto exportDir = (PIMAGE_EXPORT_DIRECTORY)((std::uint8_t*)(mappedBase) + exportDirRVA);
+
+	auto funcRVAs = (DWORD*)((std::uint8_t*)(mappedBase) + exportDir->AddressOfFunctions);
+	auto nameRVAs = (DWORD*)((std::uint8_t*)(mappedBase) + exportDir->AddressOfNames);
+	auto ordinals = (WORD*)((std::uint8_t*)(mappedBase) + exportDir->AddressOfNameOrdinals);
+
+	DWORD numberOfFunctions = exportDir->NumberOfFunctions;
+	DWORD numberOfNames = exportDir->NumberOfNames;
+
+	for (DWORD i = 0; i < numberOfNames; ++i) {
+		DWORD nameRVA = nameRVAs[i];
+		const char* exportName = (const char*)((std::uint8_t*)(mappedBase)+nameRVA);
+
+		WORD ordinalOffset = ordinals[i];
+		DWORD funcIndex = static_cast<DWORD>(ordinalOffset);
+
+		if (funcIndex >= numberOfFunctions)
+			continue;
+
+		DWORD funcRVA = funcRVAs[funcIndex];
+
+		if (!funcRVA)
+			continue;
+
+		if (funcRVA >= exportDirRVA && funcRVA < (exportDirRVA + exportDirSize))
+			continue;
+
+		uintptr_t funcAddress = remoteBaseAddress + funcRVA;
+
+		funcExport info;
+		info.name = exportName;
+		info.address = funcAddress;
+		exports.push_back(std::move(info));
+	}
+
+	UnmapViewOfFile(mappedBase);
+	return exports;
+}
+
+void mem::gatherExports()
+{
+	g_ExportMap.clear();
+
+	for (auto& module : moduleList) {
+		char modulePath[MAX_PATH] = { 0 };
+		if (K32GetModuleFileNameExA(memHandle, (HMODULE)module.base, modulePath, MAX_PATH)) {
+			auto exports = gatherRemoteExports(modulePath, module.base);
+
+			for (const auto& exp : exports) {
+				g_ExportMap[exp.address] = module.name + "!" + exp.name;
+			}
+		}
+	}
 }
 
 extern void initClasses(bool);
