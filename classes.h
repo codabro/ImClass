@@ -997,6 +997,6 @@ std::vector<uClass> g_Classes = { uClass(50) };
 void initClasses(bool isX32) {
 	if (g_Classes.empty() || isX32 != mem::x32) {
 		mem::x32 = isX32;
-		g_Classes = { uClass(50), uClass(50), uClass(50) };
+		g_Classes = { uClass(50) };
 	}
 }
