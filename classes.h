@@ -63,6 +63,7 @@ struct nodeTypeInfo {
 	uint8_t size;
 	char name[21];
 	ImColor color;
+	char codeName[16];
 };
 
 nodeTypeInfo nodeData[] = {
@@ -70,27 +71,28 @@ nodeTypeInfo nodeData[] = {
 	{node_hex16, sizeof(uint16_t), "Hex16", ImColor(255, 255, 255)},
 	{node_hex32, sizeof(uint32_t), "Hex32", ImColor(255, 255, 255)},
 	{node_hex64, sizeof(uint64_t), "Hex64", ImColor(255, 255, 255)},
-	{node_int8, sizeof(int8_t), "Int8", ImColor(255, 200, 0)},
-	{node_int16, sizeof(int16_t), "Int16", ImColor(255, 200, 0)},
-	{node_int32, sizeof(int32_t), "Int32", ImColor(255, 200, 0)},
-	{node_int64, sizeof(int64_t), "Int64", ImColor(255, 200, 0)},
-	{node_uint8, sizeof(uint8_t), "UInt8", ImColor(7, 247, 163)},
-	{node_uint16, sizeof(uint16_t), "UInt16", ImColor(7, 247, 163)},
-	{node_uint32, sizeof(uint32_t), "UInt32", ImColor(7, 247, 163)},
-	{node_uint64, sizeof(uint64_t), "UInt64", ImColor(7, 247, 163)},
-	{node_float, sizeof(float), "Float", ImColor(225, 143, 255)},
-	{node_double, sizeof(double), "Double", ImColor(187, 0, 255)},
-	{node_vector4, sizeof(Vector4), "Vector4", ImColor(115, 255, 124)},
-	{node_vector3, sizeof(Vector3), "Vector3", ImColor(115, 255, 124)},
-	{node_vector2, sizeof(Vector2), "Vector2", ImColor(115, 255, 124)},
-	{node_matrix4x4, sizeof(Matrix4x4), "Matrix4x4", ImColor(3, 252, 144)},
-	{node_matrix3x4, sizeof(Matrix3x4), "Matrix3x4", ImColor(3, 252, 144)},
-	{node_matrix3x3, sizeof(Matrix3x3), "Matrix3x3", ImColor(3, 252, 144)},
-	{node_bool, sizeof(bool), "Bool", ImColor(0, 183, 255) }
+	{node_int8, sizeof(int8_t), "Int8", ImColor(255, 200, 0), "int8_t"},
+	{node_int16, sizeof(int16_t), "Int16", ImColor(255, 200, 0), "int16_t"},
+	{node_int32, sizeof(int32_t), "Int32", ImColor(255, 200, 0), "int"},
+	{node_int64, sizeof(int64_t), "Int64", ImColor(255, 200, 0), "int64_t"},
+	{node_uint8, sizeof(uint8_t), "UInt8", ImColor(7, 247, 163), "uint8_t"},
+	{node_uint16, sizeof(uint16_t), "UInt16", ImColor(7, 247, 163), "uint16_t"},
+	{node_uint32, sizeof(uint32_t), "UInt32", ImColor(7, 247, 163), "uint32_t"},
+	{node_uint64, sizeof(uint64_t), "UInt64", ImColor(7, 247, 163), "uint64_t"},
+	{node_float, sizeof(float), "Float", ImColor(225, 143, 255), "float"},
+	{node_double, sizeof(double), "Double", ImColor(187, 0, 255), "double"},
+	{node_vector4, sizeof(Vector4), "Vector4", ImColor(115, 255, 124), "Vector4"},
+	{node_vector3, sizeof(Vector3), "Vector3", ImColor(115, 255, 124), "Vector3"},
+	{node_vector2, sizeof(Vector2), "Vector2", ImColor(115, 255, 124), "Vector2"},
+	{node_matrix4x4, sizeof(Matrix4x4), "Matrix4x4", ImColor(3, 252, 144), "matrix4x4_t"},
+	{node_matrix3x4, sizeof(Matrix3x4), "Matrix3x4", ImColor(3, 252, 144), "matrix3x4_t"},
+	{node_matrix3x3, sizeof(Matrix3x3), "Matrix3x3", ImColor(3, 252, 144), "matrix3x3_t"},
+	{node_bool, sizeof(bool), "Bool", ImColor(0, 183, 255), "bool"}
 };
 
 bool g_HoveringPointer = false;
 bool g_InPopup = false;
+int g_SelectedClass = 0;
 
 class nodeBase {
 public:
@@ -162,7 +164,7 @@ public:
 	void drawNumber(int i, int64_t num, int* pad);
 	void drawFloat(int i, float num, int* pad = 0);
 	void drawDouble(int i, double num, int* pad = 0);
-	void drawHexNumber(int i, uintptr_t num, int pad);
+	void drawHexNumber(int i, uintptr_t num, int pad, uintptr_t* ptrOut = 0);
 	void drawControllers(int i, int counter);
 	void changeType(int i, nodeType newType, bool selectNew = false, int* newNodes = 0);
 	void changeType(nodeType newType);
@@ -180,9 +182,36 @@ public:
 	void drawMatrix3x4(int i, Matrix3x4& value);
 	void drawMatrix3x3(int i, Matrix3x3& value);
 	void drawBool(int i, bool value);
+
+	std::string exportClass();
 };
 
 uClass g_PreviewClass(15);
+std::vector<uClass> g_Classes = { uClass(50) };
+
+std::string uClass::exportClass() {
+	std::string exportedClass = std::format("class {} {{\npublic:", name);
+	int pad = 0;
+	for (auto& node : nodes) {
+		if (node.type <= node_hex64) {
+			pad += node.size;
+			continue;
+		}
+		else {
+			if (pad > 0) {
+				std::string var = std::format("\tBYTE pad[{}];", pad);
+				exportedClass = exportedClass + "\n" + var;
+				pad = 0;
+			}
+		}
+		auto& data = nodeData[node.type];
+		std::string var = std::format("\t{} {};", data.codeName, node.name);
+		exportedClass = exportedClass + "\n" + var;
+	}
+	exportedClass += "\n};";
+
+	return exportedClass;
+}
 
 void uClass::sizeToNodes() {
 	size_t szNodes = 0;
@@ -496,7 +525,7 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 	}
 }
 
-void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
+void uClass::drawHexNumber(int i, uintptr_t num, int pad, uintptr_t* ptrOut) {
 	pad += 15;
 
 	ImColor color = ImColor(255, 162, 0);
@@ -536,6 +565,27 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 	ImGui::PushStyleColor(ImGuiCol_Text, color.Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
+
+	if (isPointer) {
+		if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+			bool found = false;
+			for (int i = 0; i < g_Classes.size(); i++) {
+				auto& lClass = g_Classes[i];
+				if (lClass.address == num) {
+					g_SelectedClass = i;
+					found = true;
+					break;
+				}
+			}
+
+			if (!found) {
+				if (ptrOut) {
+					*ptrOut = num;
+				}
+			}
+		}
+	}
+
 	copyPopup(i, numText, "hex");
 
 	if (isPointer) {
@@ -857,6 +907,8 @@ void uClass::drawNodes() {
 
 	ImVec2 parentSize = ImGui::GetContentRegionAvail();
 
+	uintptr_t clickedPointer = 0;
+
 	ImGuiListClipper clipper;
 	clipper.Begin(nodes.size());
 	while (clipper.Step()) {
@@ -911,7 +963,7 @@ void uClass::drawNodes() {
 
 				num = *(int32_t*)dataPos;
 				drawNumber(i, num, &pad);
-				drawHexNumber(i, num, pad);
+				drawHexNumber(i, num, pad, &clickedPointer);
 				break;
 			case node_hex64:
 				drawStringBytes(i, data, counter, 8);
@@ -922,7 +974,7 @@ void uClass::drawNodes() {
 
 				num = *(int64_t*)dataPos;
 				drawNumber(i, num, &pad);
-				drawHexNumber(i, num, pad);
+				drawHexNumber(i, num, pad, &clickedPointer);
 				break;
 			case node_int64:
 				drawInteger(i, *(int64_t*)dataPos, node_int64);
@@ -997,13 +1049,18 @@ void uClass::drawNodes() {
 		g_PreviewClass = uClass(15, false);
 	}
 	oHoveringPointer = g_HoveringPointer;
-}
 
-std::vector<uClass> g_Classes = { uClass(50) };
+	if (clickedPointer) {
+		uClass newClass(50);
+		newClass.address = clickedPointer;
+		g_Classes.push_back(newClass);
+		g_SelectedClass = g_Classes.size() - 1;
+	}
+}
 
 void initClasses(bool isX32) {
 	if (g_Classes.empty() || isX32 != mem::x32) {
 		mem::x32 = isX32;
-		g_Classes = { uClass(50), uClass(50), uClass(50) };
+		g_Classes = { uClass(50) };
 	}
 }

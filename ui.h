@@ -14,12 +14,12 @@ namespace ui {
     bool processWindow = false;
     bool signaturesWindow = false;
     bool sigScanWindow = false;
+    bool exportWindow = false;
+    std::string exportedClass;
     inline std::optional<PatternScanResult> patternResults;
     char addressInput[256] = "0";
 	char module[512] = { 0 };
 	char signature[512] = { 0 };
-
-	int selectedClass = 0;
 
     ImVec2 mainPos;
     ImVec2 signaturePos = {0, 0};
@@ -27,6 +27,7 @@ namespace ui {
     void init(HWND hwnd);
 	void renderProcessWindow();
 	void renderMain();
+    void renderExportWindow();
 	void render();
     bool searchMatches(std::string str, std::string term);
     uintptr_t toAddress(std::string address);
@@ -136,8 +137,8 @@ void ui::renderSignatureResults() {
 			const std::string address = toHexString(match);
             const char* cAddr = address.c_str();
 			if (ImGui::Selectable(cAddr)) {
-                if (g_Classes.size() >= selectedClass) {
-                    uClass& cClass = g_Classes[selectedClass];
+                if (g_Classes.size() >= g_SelectedClass) {
+                    uClass& cClass = g_Classes[g_SelectedClass];
                     updateAddressBox(addressInput, (char*)(cAddr));
                     updateAddressBox(cClass.addressInput, (char*)(cAddr));
                     updateAddress(match, &cClass.address);
@@ -199,10 +200,33 @@ void ui::renderMain() {
             auto& lClass = g_Classes[i];
 
             if (renamedClass != i) {
-                if (ImGui::Selectable(lClass.name, (i == selectedClass))) {
-                    selectedClass = i;
+                if (ImGui::Selectable(lClass.name, (i == g_SelectedClass))) {
+                    g_SelectedClass = i;
                     updateAddress(lClass.address);
                     updateAddressBox(addressInput, lClass.addressInput);
+                }
+
+                if (ImGui::BeginPopupContextItem(("##ClassContext" + std::to_string(i)).c_str())) {
+                    if (ImGui::MenuItem("Export Class")) {
+                        uClass& sClass = g_Classes[i];
+                        std::string exported = sClass.exportClass();
+                        exportedClass = exported;
+                        exportWindow = true;
+                    }
+                    if (ImGui::MenuItem("New Class")) {
+                        g_Classes.push_back({ uClass(50) });
+                    }
+                    if (ImGui::MenuItem("Delete")) {
+                        if (g_Classes.size() > 0) {
+                            uClass& sClass = g_Classes[i];
+                            free(sClass.data);
+                            g_Classes.erase(g_Classes.begin() + i);
+                            if (g_SelectedClass > 0 && g_SelectedClass > g_Classes.size() - 1) {
+                                g_SelectedClass--;
+                            }
+                        }
+                    }
+                    ImGui::EndPopup();
                 }
 
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
@@ -225,32 +249,20 @@ void ui::renderMain() {
             }
         }
 
-        ImGui::SetCursorPos(ImVec2(columnOffset - 37, wndSize.y - 80));
-        if (ImGui::Button("+")) {
-            g_Classes.push_back({ uClass(50) });
-        }
-
-        ImGui::SetCursorPos(ImVec2(columnOffset - 58, wndSize.y - 80));
-        if (ImGui::Button("-")) {
-            if (g_Classes.size() > 0) {
-                uClass& sClass = g_Classes[selectedClass];
-                free(sClass.data);
-                g_Classes.erase(g_Classes.begin() + selectedClass);
-                if (selectedClass > 0 && selectedClass > g_Classes.size() - 1) {
-                    selectedClass--;
-                }
-            }
-        }
+        ImGui::EndChild();
 
         if (g_Classes.empty()) {
-            ImGui::EndChild();
+            if (ImGui::BeginPopupContextItem("##ClassesContext")) {
+                if (ImGui::MenuItem("New Class")) {
+                    g_Classes.push_back({ uClass(50) });
+                }
+                ImGui::EndPopup();
+            }
             ImGui::End();
             return;
         }
 
-        ImGui::EndChild();
-
-        uClass& sClass = g_Classes[selectedClass];
+        uClass& sClass = g_Classes[g_SelectedClass];
 
         ImGui::NextColumn();
 
@@ -261,7 +273,6 @@ void ui::renderMain() {
             updateAddress(newAddress, &sClass.address);
             updateAddressBox(sClass.addressInput, addressInput);
         }
-
 
         static bool oInputFocused = false;
 
@@ -332,6 +343,20 @@ void ui::renderProcessWindow() {
     ImGui::End();
 }
 
+void ui::renderExportWindow() {
+    if (!exportWindow) {
+        return;
+    }
+
+    ImGui::SetNextWindowSize(ImVec2(437, 305));
+    ImGui::Begin("Exported class", &exportWindow, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::InputTextMultiline("##exportedclass", exportedClass.data(), exportedClass.size(), ImVec2(420, 250));
+    if (ImGui::Button("Copy")) {
+        ImGui::SetClipboardText(exportedClass.c_str());
+    }
+    ImGui::End();
+}
+
 bool ui::searchMatches(std::string str, std::string term) {
     std::transform(str.begin(), str.end(), str.begin(), tolower);
     std::transform(term.begin(), term.end(), term.begin(), tolower);
@@ -341,6 +366,7 @@ bool ui::searchMatches(std::string str, std::string term) {
 void ui::render() {
     renderMain();
     renderProcessWindow();
+    renderExportWindow();
     renderSignatureScan();
     renderSignatureResults();    
 }
