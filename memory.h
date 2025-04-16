@@ -72,8 +72,9 @@ namespace mem {
     void getSections(moduleInfo& info, std::vector<moduleSection>& dest);
     bool isPointer(uintptr_t address, pointerInfo* info);
     bool rttiInfo(uintptr_t address, std::string& out);
-    std::vector<funcExport> gatherRemoteExports(const std::string& modulePath, uintptr_t remoteBaseAddress);
+    std::vector<funcExport> gatherRemoteExports(uintptr_t remoteBaseAddress);
     void gatherExports();
+    uintptr_t getExport(const std::string& moduleName, const std::string& exportName);
 
     bool read(uintptr_t address, void* buf, uintptr_t size);
     bool write(uintptr_t address, const void* buf, uintptr_t size);
@@ -273,112 +274,100 @@ bool mem::initProcess(const wchar_t* processName) {
         if (!wcscmp(proc.name.c_str(), processName)) {
             if (openHandle(proc.pid)) {
                 getModules();
+                gatherExports();
                 return true;
             }
         }
     }
 
+
     return false;
 }
 
-LPVOID mapDllFromDisk(const std::string& dllPath, DWORD& outSize)
-{
-	HANDLE hFile = CreateFileA(dllPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-	if (hFile == INVALID_HANDLE_VALUE)
-	{
-	#ifdef _DEBUG
-		std::cerr << "CreateFile failed for " << dllPath << "\n";
-	#endif
-		return nullptr;
-	}
-
-	outSize = GetFileSize(hFile, NULL);
-	if (outSize == INVALID_FILE_SIZE)
-	{
-		CloseHandle(hFile);
-		return nullptr;
-	}
-
-	HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
-	if (!hMapping)
-	{
-		CloseHandle(hFile);
-		return nullptr;
-	}
-
-	LPVOID mappedBase = MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0);
-	CloseHandle(hMapping);
-	CloseHandle(hFile);
-
-	return mappedBase;
-}
-
-std::vector<funcExport> mem::gatherRemoteExports(const std::string& modulePath, uintptr_t remoteBaseAddress)
+std::vector<funcExport> mem::gatherRemoteExports(uintptr_t moduleBase)
 {
 	std::vector<funcExport> exports;
-	DWORD mappedSize = 0;
+	IMAGE_DOS_HEADER dosHeader;
 
-	LPVOID mappedBase = mapDllFromDisk(modulePath, mappedSize);
-	if (!mappedBase) {
+	if (!read(moduleBase, &dosHeader, sizeof(IMAGE_DOS_HEADER)) || dosHeader.e_magic != IMAGE_DOS_SIGNATURE) {
 		return exports;
 	}
 
-	auto dosHeader = (PIMAGE_DOS_HEADER)(mappedBase);
-	if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE) {
-		UnmapViewOfFile(mappedBase);
+	IMAGE_NT_HEADERS ntHeaders;
+
+	if (!read(moduleBase + dosHeader.e_lfanew, &ntHeaders, sizeof(IMAGE_NT_HEADERS)) ||
+		ntHeaders.Signature != IMAGE_NT_SIGNATURE) {
 		return exports;
 	}
 
-	auto ntHeader = (PIMAGE_NT_HEADERS)((std::uint8_t*)(mappedBase)+dosHeader->e_lfanew);
-	if (ntHeader->Signature != IMAGE_NT_SIGNATURE) {
-		UnmapViewOfFile(mappedBase);
-		return exports;
-	}
-
-	DWORD exportDirRVA = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-	DWORD exportDirSize = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+	DWORD exportDirRVA = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+	DWORD exportDirSize = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
 
 	if (!exportDirRVA || !exportDirSize) {
-		UnmapViewOfFile(mappedBase);
 		return exports;
 	}
 
-	auto exportDir = (PIMAGE_EXPORT_DIRECTORY)((std::uint8_t*)(mappedBase) + exportDirRVA);
+	IMAGE_EXPORT_DIRECTORY exportDir;
 
-	auto funcRVAs = (DWORD*)((std::uint8_t*)(mappedBase) + exportDir->AddressOfFunctions);
-	auto nameRVAs = (DWORD*)((std::uint8_t*)(mappedBase) + exportDir->AddressOfNames);
-	auto ordinals = (WORD*)((std::uint8_t*)(mappedBase) + exportDir->AddressOfNameOrdinals);
+	if (!read(moduleBase + exportDirRVA, &exportDir, sizeof(IMAGE_EXPORT_DIRECTORY))) {
+		return exports;
+	}
 
-	DWORD numberOfFunctions = exportDir->NumberOfFunctions;
-	DWORD numberOfNames = exportDir->NumberOfNames;
+	std::vector<DWORD> functionRVAs(exportDir.NumberOfFunctions);
 
-	for (DWORD i = 0; i < numberOfNames; ++i) {
+	if (!read(moduleBase + exportDir.AddressOfFunctions, functionRVAs.data(),
+		exportDir.NumberOfFunctions * sizeof(DWORD))) {
+		return exports;
+	}
+
+	std::vector<DWORD> nameRVAs(exportDir.NumberOfNames);
+
+	if (!read(moduleBase + exportDir.AddressOfNames, nameRVAs.data(),
+		exportDir.NumberOfNames * sizeof(DWORD))) {
+		return exports;
+	}
+
+	std::vector<WORD> ordinals(exportDir.NumberOfNames);
+
+	if (!read(moduleBase + exportDir.AddressOfNameOrdinals, ordinals.data(),
+		exportDir.NumberOfNames * sizeof(WORD))) {
+		return exports;
+	}
+
+
+	exports.reserve(exportDir.NumberOfNames);
+
+    // for slower read methods than just ReadProcessMemory, read the entire module at once or scatter read; this code is fine with rpm, however.
+	for (DWORD i = 0; i < exportDir.NumberOfNames; ++i) {
+		char nameBuffer[256] = { 0 };
 		DWORD nameRVA = nameRVAs[i];
-		const char* exportName = (const char*)((std::uint8_t*)(mappedBase)+nameRVA);
 
-		WORD ordinalOffset = ordinals[i];
-		DWORD funcIndex = static_cast<DWORD>(ordinalOffset);
-
-		if (funcIndex >= numberOfFunctions)
+		if (!read(moduleBase + nameRVA, nameBuffer, 255)) {
 			continue;
+		}
 
-		DWORD funcRVA = funcRVAs[funcIndex];
-
-		if (!funcRVA)
+		std::string exportName = nameBuffer;
+		if (exportName.empty()) {
 			continue;
+		}
 
-		if (funcRVA >= exportDirRVA && funcRVA < (exportDirRVA + exportDirSize))
+		WORD ordinal = ordinals[i];
+		if (ordinal >= exportDir.NumberOfFunctions) {
 			continue;
+		}
 
-		uintptr_t funcAddress = remoteBaseAddress + funcRVA;
+		DWORD functionRVA = functionRVAs[ordinal];
+		if (functionRVA >= exportDirRVA && functionRVA < (exportDirRVA + exportDirSize)) {
+			continue;
+		}
 
+		uintptr_t functionAddress = moduleBase + functionRVA;
 		funcExport info;
 		info.name = exportName;
-		info.address = funcAddress;
+		info.address = functionAddress;
 		exports.push_back(std::move(info));
 	}
 
-	UnmapViewOfFile(mappedBase);
 	return exports;
 }
 
@@ -389,13 +378,29 @@ void mem::gatherExports()
 	for (auto& module : moduleList) {
 		char modulePath[MAX_PATH] = { 0 };
 		if (K32GetModuleFileNameExA(memHandle, (HMODULE)module.base, modulePath, MAX_PATH)) {
-			auto exports = gatherRemoteExports(modulePath, module.base);
+			auto exports = gatherRemoteExports(module.base);
 
 			for (const auto& exp : exports) {
 				g_ExportMap[exp.address] = module.name + "!" + exp.name;
 			}
 		}
 	}
+}
+
+uintptr_t mem::getExport(const std::string& moduleName, const std::string& exportName)
+{
+	for (auto& module : moduleList) {
+		if (_stricmp(module.name.c_str(), moduleName.c_str()) == 0) {
+			for (auto& pair : g_ExportMap) {
+				std::string fullExport = module.name + "!" + exportName;
+				if (pair.second == fullExport) {
+					return pair.first;
+				}
+			}
+			return 0;
+		}
+	}
+	return 0;
 }
 
 extern void initClasses(bool);
@@ -405,6 +410,7 @@ bool mem::initProcess(DWORD pid) {
         getModules();
         bool newX32 = isX32(memHandle);
         initClasses(newX32);
+        gatherExports();
         return true;
     }
 }
