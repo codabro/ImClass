@@ -21,8 +21,6 @@ namespace ui {
 	char module[512] = { 0 };
 	char signature[512] = { 0 };
 
-	int selectedClass = 0;
-
     ImVec2 mainPos;
     ImVec2 signaturePos = {0, 0};
 
@@ -139,8 +137,8 @@ void ui::renderSignatureResults() {
 			const std::string address = toHexString(match);
             const char* cAddr = address.c_str();
 			if (ImGui::Selectable(cAddr)) {
-                if (g_Classes.size() >= selectedClass) {
-                    uClass& cClass = g_Classes[selectedClass];
+                if (g_Classes.size() >= g_SelectedClass) {
+                    uClass& cClass = g_Classes[g_SelectedClass];
                     updateAddressBox(addressInput, (char*)(cAddr));
                     updateAddressBox(cClass.addressInput, (char*)(cAddr));
                     updateAddress(match, &cClass.address);
@@ -202,8 +200,8 @@ void ui::renderMain() {
             auto& lClass = g_Classes[i];
 
             if (renamedClass != i) {
-                if (ImGui::Selectable(lClass.name, (i == selectedClass))) {
-                    selectedClass = i;
+                if (ImGui::Selectable(lClass.name, (i == g_SelectedClass))) {
+                    g_SelectedClass = i;
                     updateAddress(lClass.address);
                     updateAddressBox(addressInput, lClass.addressInput);
                 }
@@ -223,8 +221,8 @@ void ui::renderMain() {
                             uClass& sClass = g_Classes[i];
                             free(sClass.data);
                             g_Classes.erase(g_Classes.begin() + i);
-                            if (selectedClass > 0 && selectedClass > g_Classes.size() - 1) {
-                                selectedClass--;
+                            if (g_SelectedClass > 0 && g_SelectedClass > g_Classes.size() - 1) {
+                                g_SelectedClass--;
                             }
                         }
                     }
@@ -264,7 +262,7 @@ void ui::renderMain() {
             return;
         }
 
-        uClass& sClass = g_Classes[selectedClass];
+        uClass& sClass = g_Classes[g_SelectedClass];
 
         ImGui::NextColumn();
 
