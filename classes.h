@@ -92,6 +92,7 @@ nodeTypeInfo nodeData[] = {
 
 bool g_HoveringPointer = false;
 bool g_InPopup = false;
+int g_SelectedClass = 0;
 
 class nodeBase {
 public:
@@ -163,7 +164,7 @@ public:
 	void drawNumber(int i, int64_t num, int* pad);
 	void drawFloat(int i, float num, int* pad = 0);
 	void drawDouble(int i, double num, int* pad = 0);
-	void drawHexNumber(int i, uintptr_t num, int pad);
+	void drawHexNumber(int i, uintptr_t num, int pad, uintptr_t* ptrOut = 0);
 	void drawControllers(int i, int counter);
 	void changeType(int i, nodeType newType, bool selectNew = false, int* newNodes = 0);
 	void changeType(nodeType newType);
@@ -186,6 +187,7 @@ public:
 };
 
 uClass g_PreviewClass(15);
+std::vector<uClass> g_Classes = { uClass(50) };
 
 std::string uClass::exportClass() {
 	std::string exportedClass = std::format("class {} {{\npublic:", name);
@@ -523,7 +525,7 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 	}
 }
 
-void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
+void uClass::drawHexNumber(int i, uintptr_t num, int pad, uintptr_t* ptrOut) {
 	pad += 15;
 
 	ImColor color = ImColor(255, 162, 0);
@@ -556,6 +558,27 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad) {
 	ImGui::PushStyleColor(ImGuiCol_Text, color.Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
+
+	if (isPointer) {
+		if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+			bool found = false;
+			for (int i = 0; i < g_Classes.size(); i++) {
+				auto& lClass = g_Classes[i];
+				if (lClass.address == num) {
+					g_SelectedClass = i;
+					found = true;
+					break;
+				}
+			}
+
+			if (!found) {
+				if (ptrOut) {
+					*ptrOut = num;
+				}
+			}
+		}
+	}
+
 	copyPopup(i, numText, "hex");
 
 	if (isPointer) {
@@ -877,6 +900,8 @@ void uClass::drawNodes() {
 
 	ImVec2 parentSize = ImGui::GetContentRegionAvail();
 
+	uintptr_t clickedPointer = 0;
+
 	ImGuiListClipper clipper;
 	clipper.Begin(nodes.size());
 	while (clipper.Step()) {
@@ -931,7 +956,7 @@ void uClass::drawNodes() {
 
 				num = *(int32_t*)dataPos;
 				drawNumber(i, num, &pad);
-				drawHexNumber(i, num, pad);
+				drawHexNumber(i, num, pad, &clickedPointer);
 				break;
 			case node_hex64:
 				drawStringBytes(i, data, counter, 8);
@@ -942,7 +967,7 @@ void uClass::drawNodes() {
 
 				num = *(int64_t*)dataPos;
 				drawNumber(i, num, &pad);
-				drawHexNumber(i, num, pad);
+				drawHexNumber(i, num, pad, &clickedPointer);
 				break;
 			case node_int64:
 				drawInteger(i, *(int64_t*)dataPos, node_int64);
@@ -1017,9 +1042,14 @@ void uClass::drawNodes() {
 		g_PreviewClass = uClass(15, false);
 	}
 	oHoveringPointer = g_HoveringPointer;
-}
 
-std::vector<uClass> g_Classes = { uClass(50) };
+	if (clickedPointer) {
+		uClass newClass(50);
+		newClass.address = clickedPointer;
+		g_Classes.push_back(newClass);
+		g_SelectedClass = g_Classes.size() - 1;
+	}
+}
 
 void initClasses(bool isX32) {
 	if (g_Classes.empty() || isX32 != mem::x32) {
