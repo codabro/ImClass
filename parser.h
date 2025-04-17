@@ -5,12 +5,15 @@
 #include <string>
 #include <vector>
 
+#include "memory.h"
+
 namespace ui {
 	extern uintptr_t toAddress(std::string address);
 	extern bool isValidHex(std::string& str);
 }
 
 namespace addressParser {
+	uintptr_t parseExport(const std::string& expression);
 	uintptr_t parseInput(const char* str);
 }
 
@@ -18,6 +21,20 @@ inline std::list<std::string> g_fileEndings = {
 	".dll",
 	".exe"
 };
+
+uintptr_t addressParser::parseExport(const std::string& expression)
+{
+	size_t delimPos = expression.find('!');
+
+	if (delimPos != std::string::npos) {
+		std::string moduleName = expression.substr(0, delimPos);
+		std::string exportName = expression.substr(delimPos + 1);
+
+		return mem::getExport(moduleName, exportName);
+	}
+
+	return 0;
+}
 
 inline uintptr_t addressParser::parseInput(const char* str) {
 	std::string expression(str);
@@ -63,27 +80,31 @@ inline uintptr_t addressParser::parseInput(const char* str) {
 		}
 
 		uintptr_t value = 0;
-
-		bool isModule = false;
-
-		for (const std::string& ending : g_fileEndings) {
-			if (curToken.find(ending) != std::string::npos) {
-				std::wstring token(curToken.begin(), curToken.end());
-				moduleInfo info;
-				if (mem::getModuleInfo(mem::pid, token.c_str(), &info)) {
-					value = info.base;
-					isModule = true;
-				}
-				break; // break out of file endings loop, continue in main
-			}
+		if (curToken.find('!') != std::string::npos) {
+			value = parseExport(curToken);
 		}
+		else {
+			bool isModule = false;
 
-		if (!isModule) {
-			if (ui::isValidHex(curToken)) {
-				value = ui::toAddress(curToken);
+			for (const std::string& ending : g_fileEndings) {
+				if (curToken.find(ending) != std::string::npos) {
+					std::wstring token(curToken.begin(), curToken.end());
+					moduleInfo info;
+					if (mem::getModuleInfo(mem::pid, token.c_str(), &info)) {
+						value = info.base;
+						isModule = true;
+					}
+					break; // break out of file endings loop, continue in main
+				}
 			}
-			else {
-				value = 0;
+
+			if (!isModule) {
+				if (ui::isValidHex(curToken)) {
+					value = ui::toAddress(curToken);
+				}
+				else {
+					value = 0;
+				}
 			}
 		}
 

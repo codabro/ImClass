@@ -543,7 +543,14 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad, uintptr_t* ptrOut) {
 			toDraw = "[heap] " + toDraw;
 		}
 		else {
-			toDraw = std::format("[{}] {} {}", info.section, info.moduleName.c_str(), toDraw.c_str());
+			auto exportIt = mem::g_ExportMap.find(num);
+			if (exportIt != mem::g_ExportMap.end()) {
+				color = ImColor(0, 255, 0);
+				toDraw = "[EXPORT] " + exportIt->second + " " + toDraw;
+			}
+			else {
+				toDraw = std::format("[{}] {} {}", info.section, info.moduleName.c_str(), toDraw.c_str());
+			}
 		}
 
 		std::string rttiNames;

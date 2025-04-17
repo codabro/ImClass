@@ -3,6 +3,8 @@
 #include <Windows.h>
 #include <vector>
 #include <tlhelp32.h>
+#include <unordered_map>
+#include <Psapi.h>
 
 struct processSnapshot {
     std::wstring name;
@@ -49,11 +51,18 @@ struct TypeDescriptor {
     char name[60];
 };
 
+struct funcExport
+{
+	std::string name;
+	uintptr_t address;
+};
+
 namespace mem {
     std::vector<processSnapshot> processes;
     HANDLE memHandle;
     DWORD pid;
     std::vector<moduleInfo> moduleList;
+    std::unordered_map<uintptr_t, std::string> g_ExportMap;
     bool x32 = false;
 
     bool getProcessList();
@@ -63,6 +72,9 @@ namespace mem {
     void getSections(moduleInfo& info, std::vector<moduleSection>& dest);
     bool isPointer(uintptr_t address, pointerInfo* info);
     bool rttiInfo(uintptr_t address, std::string& out);
+    std::vector<funcExport> gatherRemoteExports(uintptr_t remoteBaseAddress);
+    void gatherExports();
+    uintptr_t getExport(const std::string& moduleName, const std::string& exportName);
 
     bool read(uintptr_t address, void* buf, uintptr_t size);
     bool write(uintptr_t address, const void* buf, uintptr_t size);
@@ -262,12 +274,133 @@ bool mem::initProcess(const wchar_t* processName) {
         if (!wcscmp(proc.name.c_str(), processName)) {
             if (openHandle(proc.pid)) {
                 getModules();
+                gatherExports();
                 return true;
             }
         }
     }
 
+
     return false;
+}
+
+std::vector<funcExport> mem::gatherRemoteExports(uintptr_t moduleBase)
+{
+	std::vector<funcExport> exports;
+	IMAGE_DOS_HEADER dosHeader;
+
+	if (!read(moduleBase, &dosHeader, sizeof(IMAGE_DOS_HEADER)) || dosHeader.e_magic != IMAGE_DOS_SIGNATURE) {
+		return exports;
+	}
+
+	IMAGE_NT_HEADERS ntHeaders;
+
+	if (!read(moduleBase + dosHeader.e_lfanew, &ntHeaders, sizeof(IMAGE_NT_HEADERS)) ||
+		ntHeaders.Signature != IMAGE_NT_SIGNATURE) {
+		return exports;
+	}
+
+	DWORD exportDirRVA = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+	DWORD exportDirSize = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+
+	if (!exportDirRVA || !exportDirSize) {
+		return exports;
+	}
+
+	IMAGE_EXPORT_DIRECTORY exportDir;
+
+	if (!read(moduleBase + exportDirRVA, &exportDir, sizeof(IMAGE_EXPORT_DIRECTORY))) {
+		return exports;
+	}
+
+	std::vector<DWORD> functionRVAs(exportDir.NumberOfFunctions);
+
+	if (!read(moduleBase + exportDir.AddressOfFunctions, functionRVAs.data(),
+		exportDir.NumberOfFunctions * sizeof(DWORD))) {
+		return exports;
+	}
+
+	std::vector<DWORD> nameRVAs(exportDir.NumberOfNames);
+
+	if (!read(moduleBase + exportDir.AddressOfNames, nameRVAs.data(),
+		exportDir.NumberOfNames * sizeof(DWORD))) {
+		return exports;
+	}
+
+	std::vector<WORD> ordinals(exportDir.NumberOfNames);
+
+	if (!read(moduleBase + exportDir.AddressOfNameOrdinals, ordinals.data(),
+		exportDir.NumberOfNames * sizeof(WORD))) {
+		return exports;
+	}
+
+
+	exports.reserve(exportDir.NumberOfNames);
+
+    // for slower read methods than just ReadProcessMemory, read the entire module at once or scatter read; this code is fine with rpm, however.
+	for (DWORD i = 0; i < exportDir.NumberOfNames; ++i) {
+		char nameBuffer[256] = { 0 };
+		DWORD nameRVA = nameRVAs[i];
+
+		if (!read(moduleBase + nameRVA, nameBuffer, 255)) {
+			continue;
+		}
+
+		std::string exportName = nameBuffer;
+		if (exportName.empty()) {
+			continue;
+		}
+
+		WORD ordinal = ordinals[i];
+		if (ordinal >= exportDir.NumberOfFunctions) {
+			continue;
+		}
+
+		DWORD functionRVA = functionRVAs[ordinal];
+		if (functionRVA >= exportDirRVA && functionRVA < (exportDirRVA + exportDirSize)) {
+			continue;
+		}
+
+		uintptr_t functionAddress = moduleBase + functionRVA;
+		funcExport info;
+		info.name = exportName;
+		info.address = functionAddress;
+		exports.push_back(std::move(info));
+	}
+
+	return exports;
+}
+
+void mem::gatherExports()
+{
+	g_ExportMap.clear();
+
+	for (auto& module : moduleList) {
+		char modulePath[MAX_PATH] = { 0 };
+		if (K32GetModuleFileNameExA(memHandle, (HMODULE)module.base, modulePath, MAX_PATH)) {
+			auto exports = gatherRemoteExports(module.base);
+
+			for (const auto& exp : exports) {
+				g_ExportMap[exp.address] = module.name + "!" + exp.name;
+			}
+		}
+	}
+}
+
+uintptr_t mem::getExport(const std::string& moduleName, const std::string& exportName)
+{
+	for (auto& module : moduleList) {
+		if (_stricmp(module.name.c_str(), moduleName.c_str()) == 0) {
+			for (auto& pair : g_ExportMap) {
+				std::string fullExport = module.name + "!" + exportName;
+				if (pair.second == fullExport) {
+					return pair.first;
+				}
+			}
+			return 0;
+		}
+	}
+	return 0;
 }
 
 extern void initClasses(bool);
@@ -277,6 +410,7 @@ bool mem::initProcess(DWORD pid) {
         getModules();
         bool newX32 = isX32(memHandle);
         initClasses(newX32);
+        gatherExports();
         return true;
     }
 }
