@@ -41,10 +41,23 @@ public:
 
 namespace pattern
 {
+	std::string stringToSignature(const std::string& in);
 	std::optional<PatternInfo> detectPatternType(const std::string& in);
-	std::optional<PatternScanResult> scanPattern(PatternInfo& patternInfo, const std::string& dllName);
+	std::optional<PatternScanResult> scanPattern(PatternInfo& patternInfo, const std::string& dllName, std::optional<PatternType> patternType);
 	std::optional<PatternScanResult> findBytePattern(uintptr_t baseAddress, size_t size, const uint8_t* signature, const char* mask);
 	bool patternToMask(const PatternInfo& patternInfo, std::vector<uint8_t>& outBytes, std::string& outMask);
+}
+
+inline std::string pattern::stringToSignature(const std::string& in) {
+	std::stringstream result;
+
+	for (size_t i = 0; i < in.length(); i++) {
+
+		result << "\\\\x" << std::uppercase << std::setfill('0') << std::setw(2)
+			<< std::hex << (static_cast<int>(in[i]) & 0xFF);
+	}
+
+	return result.str();
 }
 
 inline std::optional<PatternInfo> pattern::detectPatternType(const std::string& in)
@@ -197,12 +210,14 @@ inline std::optional<PatternScanResult> pattern::findBytePattern(uintptr_t baseA
 }
 
 
-inline std::optional<PatternScanResult> pattern::scanPattern(PatternInfo& patternInfo, const std::string& dllName)
+inline std::optional<PatternScanResult> pattern::scanPattern(PatternInfo& patternInfo, const std::string& dllName, std::optional<PatternType> inputPatternType = std::nullopt)
 {
-	auto patternType = detectPatternType(patternInfo.pattern);
+	if (inputPatternType != std::nullopt) {
+		auto patternType = detectPatternType(patternInfo.pattern);
 
-	if (patternType != std::nullopt) {
-		patternInfo.type = patternType->type;
+		if (patternType != std::nullopt) {
+			patternInfo.type = patternType->type;
+		}
 	}
 
 	std::wstring wideName(dllName.begin(), dllName.end()); // windows api requires widestring, maybe change input type?

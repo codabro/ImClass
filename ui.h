@@ -13,6 +13,7 @@ namespace ui {
     bool open = true;
     bool processWindow = false;
     bool signaturesWindow = false;
+    bool stringSearchWindow = false;
     bool sigScanWindow = false;
     bool exportWindow = false;
     std::string exportedClass;
@@ -20,9 +21,11 @@ namespace ui {
     char addressInput[256] = "0";
 	char module[512] = { 0 };
 	char signature[512] = { 0 };
+    char searchString[512] = { 0 };
 
     ImVec2 mainPos;
     ImVec2 signaturePos = {0, 0};
+    ImVec2 stringSearchPos = { 0, 0 };
 
     void init(HWND hwnd);
 	void renderProcessWindow();
@@ -36,8 +39,15 @@ namespace ui {
     void updateAddress(uintptr_t newAddress, uintptr_t* dest = 0);
     void renderSignatureResults();
     void renderSignatureScan();
+	void renderStringScan();
     void updateAddressBox(char* dest, char* src);
 }
+
+// reused for small tool windows
+constexpr float headerHeight = 30.0f;
+constexpr float footerHeight = 30.0f;
+constexpr float minWidth = 300.0f;
+constexpr float padding = 20.0f;
 
 void ui::updateAddressBox(char* dest, char* src) {
     memset(dest, 0, sizeof(addressInput));
@@ -53,10 +63,6 @@ inline void ui::renderSignatureScan()
 	}
 
 	const float entryHeight = ImGui::GetTextLineHeightWithSpacing();
-	constexpr float headerHeight = 30.0f;
-	constexpr float footerHeight = 30.0f;
-	constexpr float minWidth = 300.0f;
-	constexpr float padding = 20.0f;
 
 	constexpr int numElements = 3;
 	const float contentHeight = (entryHeight * numElements) + padding;
@@ -98,6 +104,60 @@ inline void ui::renderSignatureScan()
     signaturePos = ImGui::GetWindowPos();
 
 	ImGui::End();
+}
+
+inline void ui::renderStringScan()
+{
+    static bool oStringSearchWindow = false;
+    if (!stringSearchWindow) {
+        oStringSearchWindow = stringSearchWindow;
+        return;
+    }
+
+    const float entryHeight = ImGui::GetTextLineHeightWithSpacing();
+
+    constexpr int numElements = 3;
+    const float contentHeight = (entryHeight * numElements) + padding;
+    const float windowHeight = min(headerHeight + contentHeight + footerHeight, 300.0f);
+    static bool hasSetPos = false;
+
+    if (stringSearchWindow != oStringSearchWindow) {
+        if (hasSetPos) {
+            ImGui::SetNextWindowPos(stringSearchPos, ImGuiCond_Always);
+        }
+        else
+        {
+            ImVec2 defaultPos = ImVec2(mainPos.x + 50, mainPos.y + 50);
+            ImGui::SetNextWindowPos(defaultPos, ImGuiCond_Always);
+            stringSearchPos = ImVec2(defaultPos);
+            hasSetPos = true;
+        }
+        ImGui::SetNextWindowSize(ImVec2(minWidth, windowHeight), ImGuiCond_Always);
+    }
+    oStringSearchWindow = stringSearchWindow;
+
+    ImGui::Begin("String Scanner", &stringSearchWindow);
+    ImGui::InputText("Module", module, sizeof(module));
+    ImGui::InputText("String", searchString, sizeof(searchString));
+    if (ImGui::Button("Scan")) {
+        PatternInfo pattern;
+		std::string patternString = pattern::stringToSignature(searchString);
+
+        pattern.pattern = patternString;
+        patternResults = pattern::scanPattern(pattern, module, PatternType::BYTE_PATTERN);
+        if (patternResults != std::nullopt && !patternResults.value().matches.empty()) {
+            signaturesWindow = true;
+        }
+        stringSearchWindow = false;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel")) {
+        stringSearchWindow = false;
+    }
+
+    stringSearchPos = ImGui::GetWindowPos();
+
+    ImGui::End();
 }
 
 
@@ -179,6 +239,11 @@ void ui::renderMain() {
             {
                 sigScanWindow = true;
             }
+			if (ImGui::MenuItem("String Scanner"))
+			{
+				stringSearchWindow = true;
+			}
+
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();
@@ -369,6 +434,7 @@ void ui::render() {
     renderExportWindow();
     renderSignatureScan();
     renderSignatureResults();    
+	renderStringScan();
 }
 
 void ui::init(HWND hwnd) {
