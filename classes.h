@@ -124,6 +124,7 @@ public:
 	int varCounter = 0;
 	size_t size;
 	BYTE* data = 0;
+	int pad = 0;
 
 	uClass(int nodeCount, bool incrementCounter = true) {
 		size = 0;
@@ -161,10 +162,10 @@ public:
 	void drawOffset(int i, int pos);
 	void drawAddress(int i, int pos);
 	void drawBytes(int i, BYTE* data, int pos, int size);
-	void drawNumber(int i, int64_t num, int* pad);
-	void drawFloat(int i, float num, int* pad = 0);
-	void drawDouble(int i, double num, int* pad = 0);
-	void drawHexNumber(int i, uintptr_t num, int pad, uintptr_t* ptrOut = 0);
+	void drawNumber(int i, int64_t num);
+	void drawFloat(int i, float num);
+	void drawDouble(int i, double num);
+	void drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut = 0);
 	void drawControllers(int i, int counter);
 	void changeType(int i, nodeType newType, bool selectNew = false, int* newNodes = 0);
 	void changeType(nodeType newType);
@@ -525,7 +526,7 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 	}
 }
 
-void uClass::drawHexNumber(int i, uintptr_t num, int pad, uintptr_t* ptrOut) {
+void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 	pad += 15;
 
 	ImColor color = ImColor(255, 162, 0);
@@ -631,15 +632,13 @@ void uClass::drawHexNumber(int i, uintptr_t num, int pad, uintptr_t* ptrOut) {
 	}
 }
 
-void uClass::drawDouble(int i, double num, int* pad) {
+void uClass::drawDouble(int i, double num) {
 	std::string toDraw = std::format("{:.3f}", num);
 	if (toDraw.size() > 20) {
 		toDraw = "#####";
 	}
 
-	if (pad) {
-		*pad += ImGui::CalcTextSize(toDraw.c_str()).x;
-	}
+	pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 
 	ImGui::SetCursorPos(ImVec2(455, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
@@ -649,15 +648,13 @@ void uClass::drawDouble(int i, double num, int* pad) {
 	copyPopup(i, toDraw, "dbl");
 }
 
-void uClass::drawFloat(int i, float num, int* pad) {
+void uClass::drawFloat(int i, float num) {
 	std::string toDraw = std::format("{:.3f}", num);
 	if (toDraw.size() > 20) {
 		toDraw = "#####";
 	}
 
-	if (pad) {
-		*pad += ImGui::CalcTextSize(toDraw.c_str()).x;
-	}
+	pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 
 	ImGui::SetCursorPos(ImVec2(455, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
@@ -667,21 +664,21 @@ void uClass::drawFloat(int i, float num, int* pad) {
 	copyPopup(i, toDraw, "flt");
 }
 
-void uClass::drawNumber(int i, int64_t num, int* pad) {
-	if (*pad > 0) {
-		*pad += 15;
+void uClass::drawNumber(int i, int64_t num) {
+	if (pad > 0) {
+		pad += 15;
 	}
 
 	std::string toDraw = std::to_string(num);
 
-	ImGui::SetCursorPos(ImVec2(455 + *pad, 0));
+	ImGui::SetCursorPos(ImVec2(455 + pad, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 218, 133).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
 
 	copyPopup(i, toDraw, "num");
 
-	*pad += ImGui::CalcTextSize(toDraw.c_str()).x;
+	pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 }
 
 void uClass::drawOffset(int i, int pos) {
@@ -933,7 +930,7 @@ void uClass::drawNodes() {
 			uintptr_t num = 0;
 			float floatNum;
 			double doubleNum;
-			int pad = 0;
+			pad = 0;
 
 			// this kinda sucks
 			uintptr_t dataPos = (uintptr_t)data + counter;
@@ -943,38 +940,38 @@ void uClass::drawNodes() {
 				drawBytes(i, data, counter, 1);
 
 				num = *(int8_t*)dataPos;
-				drawNumber(i, num, &pad);
-				drawHexNumber(i, num, pad);
+				drawNumber(i, num);
+				drawHexNumber(i, num);
 				break;
 			case node_hex16:
 				drawStringBytes(i, data, counter, 2);
 				drawBytes(i, data, counter, 2);
 
 				num = *(int16_t*)dataPos;
-				drawNumber(i, num, &pad);
-				drawHexNumber(i, num, pad);
+				drawNumber(i, num);
+				drawHexNumber(i, num);
 				break;
 			case node_hex32:
 				drawStringBytes(i, data, counter, 4);
 				drawBytes(i, data, counter, 4);
 
 				floatNum = *(float*)dataPos;
-				drawFloat(i, floatNum, &pad);
+				drawFloat(i, floatNum);
 
 				num = *(int32_t*)dataPos;
-				drawNumber(i, num, &pad);
-				drawHexNumber(i, num, pad, &clickedPointer);
+				drawNumber(i, num);
+				drawHexNumber(i, num, &clickedPointer);
 				break;
 			case node_hex64:
 				drawStringBytes(i, data, counter, 8);
 				drawBytes(i, data, counter, 8);
 
 				doubleNum = *(double*)dataPos;
-				drawDouble(i, doubleNum, &pad);
+				drawDouble(i, doubleNum);
 
 				num = *(int64_t*)dataPos;
-				drawNumber(i, num, &pad);
-				drawHexNumber(i, num, pad, &clickedPointer);
+				drawNumber(i, num);
+				drawHexNumber(i, num, &clickedPointer);
 				break;
 			case node_int64:
 				drawInteger(i, *(int64_t*)dataPos, node_int64);
