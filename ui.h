@@ -41,6 +41,7 @@ namespace ui {
     void renderSignatureScan();
 	void renderStringScan();
     void updateAddressBox(char* dest, char* src);
+    void cleanDeadProcess();
 }
 
 // reused for small tool windows
@@ -53,6 +54,17 @@ void ui::updateAddressBox(char* dest, char* src) {
     memset(dest, 0, sizeof(addressInput));
     memcpy(dest, src, strlen(src));
 }
+
+void ui::cleanDeadProcess()
+{
+    mem::cleanDeadProcess();
+
+	for (auto &cClass : g_Classes)
+	{
+        memset(cClass.data, 0, cClass.size);
+	}
+}
+
 
 inline void ui::renderSignatureScan()
 {
@@ -93,7 +105,7 @@ inline void ui::renderSignatureScan()
 		patternResults = pattern::scanPattern(pattern, module);
 		if (patternResults != std::nullopt && !patternResults.value().matches.empty()) {
 			signaturesWindow = true;
-		}
+		};
 		sigScanWindow = false;
 	}
 	ImGui::SameLine();
@@ -362,6 +374,15 @@ void ui::renderMain() {
         ImGui::EndChild();
 
         ImGui::EndChild();
+
+		bool processActive = mem::isProcessAlive() && mem::activeProcess;
+        static bool processWasActive = false;
+
+        if (processWasActive && !processActive)
+            cleanDeadProcess();
+
+        processWasActive = processActive;
+
     }
     ImGui::End();
 }

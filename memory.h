@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <Windows.h>
 #include <vector>
 #include <tlhelp32.h>
@@ -78,9 +79,15 @@ namespace mem {
 
     bool read(uintptr_t address, void* buf, uintptr_t size);
     bool write(uintptr_t address, const void* buf, uintptr_t size);
-    bool initProcess(const wchar_t* processName);
     bool initProcess(DWORD pid);
     bool isX32(HANDLE handle);
+
+    bool activeProcess = false;
+    std::chrono::steady_clock::time_point lastCheck = std::chrono::steady_clock::now();
+    constexpr std::chrono::milliseconds PROCESS_CHECK_INTERVAL{ 1000 };
+
+    bool isProcessAlive();
+    void cleanDeadProcess();
 }
 
 bool mem::isX32(HANDLE handle) {
@@ -265,25 +272,6 @@ bool mem::write(uintptr_t address, const void* buf, uintptr_t size) {
     return WriteProcessMemory(memHandle, (void*)address, buf, size, &sizeWritten);
 }
 
-bool mem::initProcess(const wchar_t* processName) {
-    if (!getProcessList()) {
-        return false;
-    }
-
-    for (auto& proc : processes) {
-        if (!wcscmp(proc.name.c_str(), processName)) {
-            if (openHandle(proc.pid)) {
-                getModules();
-                gatherExports();
-                return true;
-            }
-        }
-    }
-
-
-    return false;
-}
-
 std::vector<funcExport> mem::gatherRemoteExports(uintptr_t moduleBase)
 {
 	std::vector<funcExport> exports;
@@ -401,6 +389,41 @@ uintptr_t mem::getExport(const std::string& moduleName, const std::string& expor
 		}
 	}
 	return 0;
+}
+
+bool mem::isProcessAlive()
+{
+	if (!memHandle || memHandle == INVALID_HANDLE_VALUE)
+        return false;
+
+    auto curTime = std::chrono::steady_clock::now();
+
+    if (curTime - lastCheck < PROCESS_CHECK_INTERVAL)
+        return activeProcess;
+    
+    lastCheck = curTime;
+
+    DWORD exitCode;
+	if (!GetExitCodeProcess(memHandle, &exitCode) || exitCode != STILL_ACTIVE) {
+		activeProcess = false;
+		return false;
+	}
+
+	activeProcess = true;
+	return true;
+}
+
+// used internally by ui::cleanDeadProcess
+void mem::cleanDeadProcess() {
+	if (memHandle && memHandle != INVALID_HANDLE_VALUE) {
+		CloseHandle(memHandle);
+		memHandle = nullptr;
+	}
+
+	moduleList.clear();
+	g_ExportMap.clear();
+	pid = 0;
+	activeProcess = false;
 }
 
 extern void initClasses(bool);
