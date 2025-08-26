@@ -1,10 +1,8 @@
 #pragma once
 
-#include <cstdint>
 #include <list>
 #include <string>
 #include <vector>
-
 #include "memory.h"
 
 namespace ui {
@@ -22,7 +20,7 @@ inline std::list<std::string> g_fileEndings = {
 	".exe"
 };
 
-uintptr_t addressParser::parseExport(const std::string& expression)
+inline uintptr_t addressParser::parseExport(const std::string& expression)
 {
 	size_t delimPos = expression.find('!');
 

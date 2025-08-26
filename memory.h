@@ -446,6 +446,7 @@ bool mem::initProcess(DWORD pid) {
         gatherExports();
         return true;
     }
+    return false;
 }
 
 template <typename T>

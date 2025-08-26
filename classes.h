@@ -362,9 +362,9 @@ void uClass::drawMatrix4x4(int i, Matrix4x4& value) {
 void uClass::drawMatrix3x4(int i, Matrix3x4& value) {
 	auto& node = nodes[i];
 
-	int xPad = drawVariableName(i, node_matrix3x4);
-	int mPad = 0;
-	int y = 0;
+	float xPad = static_cast<float>(drawVariableName(i, node_matrix3x4));
+	float mPad = 0;
+	float y = 0;
 
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 4; j++) {
@@ -909,7 +909,7 @@ void uClass::drawNodes() {
 	ImGuiListClipper clipper;
 	clipper.Begin(nodes.size());
 	while (clipper.Step()) {
-		size_t counter = 0;
+		int counter = 0;
 		for (int i = 0; i < clipper.DisplayStart; i++) {
 			auto& node = nodes[i];
 			counter += node.size;
@@ -927,52 +927,58 @@ void uClass::drawNodes() {
 			drawAddress(i, counter);
 
 			size_t lCounter = 0;
-			uintptr_t num = 0;
-			float floatNum;
-			double doubleNum;
 			pad = 0;
 
 			// this kinda sucks
 			uintptr_t dataPos = (uintptr_t)data + counter;
 			switch (node.type) {
 			case node_hex8:
+			{
 				drawStringBytes(i, data, counter, 1);
 				drawBytes(i, data, counter, 1);
 
-				num = *(int8_t*)dataPos;
+				auto num = *(int8_t*)dataPos;
 				drawNumber(i, num);
 				drawHexNumber(i, num);
+
 				break;
+			}
 			case node_hex16:
+			{
 				drawStringBytes(i, data, counter, 2);
 				drawBytes(i, data, counter, 2);
 
-				num = *(int16_t*)dataPos;
+				auto num = *(int16_t*)dataPos;
 				drawNumber(i, num);
 				drawHexNumber(i, num);
 				break;
+			}
 			case node_hex32:
+				{
 				drawStringBytes(i, data, counter, 4);
 				drawBytes(i, data, counter, 4);
 
-				floatNum = *(float*)dataPos;
-				drawFloat(i, floatNum);
+				auto fNum = *(float*)dataPos;
+				drawFloat(i, fNum);
 
-				num = *(int32_t*)dataPos;
+				auto num = *(int32_t*)dataPos;
 				drawNumber(i, num);
 				drawHexNumber(i, num, &clickedPointer);
 				break;
+				}
 			case node_hex64:
+			{
 				drawStringBytes(i, data, counter, 8);
 				drawBytes(i, data, counter, 8);
 
-				doubleNum = *(double*)dataPos;
-				drawDouble(i, doubleNum);
+				auto dNum = *(double*)dataPos;
+				drawDouble(i, dNum);
 
-				num = *(int64_t*)dataPos;
+				auto num = *(int64_t*)dataPos;
 				drawNumber(i, num);
 				drawHexNumber(i, num, &clickedPointer);
 				break;
+			}
 			case node_int64:
 				drawInteger(i, *(int64_t*)dataPos, node_int64);
 				break;

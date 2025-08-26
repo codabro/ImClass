@@ -178,7 +178,6 @@ inline std::optional<PatternScanResult> pattern::findBytePattern(uintptr_t baseA
 
 	std::vector<uint8_t> buffer(size);
 
-	SIZE_T bytesRead;
 	if (!mem::read(baseAddress, buffer.data(), size)) {
 		return std::nullopt;
 	}
