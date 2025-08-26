@@ -66,7 +66,7 @@ struct nodeTypeInfo {
 	char codeName[16];
 };
 
-nodeTypeInfo nodeData[] = {
+inline nodeTypeInfo nodeData[] = {
 	{node_hex8, sizeof(uint8_t), "Hex8", ImColor(255, 255, 255)},
 	{node_hex16, sizeof(uint16_t), "Hex16", ImColor(255, 255, 255)},
 	{node_hex32, sizeof(uint32_t), "Hex32", ImColor(255, 255, 255)},
@@ -90,9 +90,9 @@ nodeTypeInfo nodeData[] = {
 	{node_bool, sizeof(bool), "Bool", ImColor(0, 183, 255), "bool"}
 };
 
-bool g_HoveringPointer = false;
-bool g_InPopup = false;
-int g_SelectedClass = 0;
+inline bool g_HoveringPointer = false;
+inline bool g_InPopup = false;
+inline size_t g_SelectedClass = 0;
 
 class nodeBase {
 public:
@@ -113,7 +113,7 @@ public:
 	}
 };
 
-int nameCounter = 0;
+inline int g_nameCounter = 0;
 
 class uClass {
 public:
@@ -124,7 +124,7 @@ public:
 	int varCounter = 0;
 	size_t size;
 	BYTE* data = 0;
-	int pad = 0;
+	int cur_pad = 0;
 
 	uClass(int nodeCount, bool incrementCounter = true) {
 		size = 0;
@@ -138,7 +138,7 @@ public:
 		memset(addressInput, 0, sizeof(addressInput));
 		addressInput[0] = '0';
 
-		std::string newName = "Class_" + std::to_string(nameCounter);
+		std::string newName = "Class_" + std::to_string(g_nameCounter);
 		memcpy(name, newName.data(), newName.size());
 
 		data = (BYTE*)malloc(size);
@@ -151,14 +151,14 @@ public:
 		}
 
 		if (incrementCounter) {
-			nameCounter++;
+			g_nameCounter++;
 		}
 	}
 
 	void sizeToNodes();
 	void resize(int size);
 	void drawNodes();
-	void drawStringBytes(int i, BYTE* data, int pos, int size);
+	void drawStringBytes(int i, const BYTE* data, int pos, int size);
 	void drawOffset(int i, int pos);
 	void drawAddress(int i, int pos);
 	void drawBytes(int i, BYTE* data, int pos, int size);
@@ -187,10 +187,10 @@ public:
 	std::string exportClass();
 };
 
-uClass g_PreviewClass(15);
-std::vector<uClass> g_Classes = { uClass(50) };
+inline uClass g_PreviewClass(15);
+inline std::vector<uClass> g_Classes = { uClass(50) };
 
-std::string uClass::exportClass() {
+inline std::string uClass::exportClass() {
 	std::string exportedClass = std::format("class {} {{\npublic:", name);
 	int pad = 0;
 	for (auto& node : nodes) {
@@ -214,7 +214,7 @@ std::string uClass::exportClass() {
 	return exportedClass;
 }
 
-void uClass::sizeToNodes() {
+inline void uClass::sizeToNodes() {
 	size_t szNodes = 0;
 	for (auto& node : nodes) {
 		szNodes += node.size;
@@ -230,7 +230,7 @@ void uClass::sizeToNodes() {
 	size = szNodes;
 }
 
-void uClass::resize(int mod) {
+inline void uClass::resize(int mod) {
 	assert(mod > 0 || mod == -8); // not intended
 
 	int newSize = size + mod;
@@ -247,19 +247,19 @@ void uClass::resize(int mod) {
 		while (remaining > 0) {
 			if (remaining >= 8) {
 				remaining = remaining - 8;
-				nodes.push_back({ 0, node_hex64, false });
+				nodes.push_back({ nullptr, node_hex64, false });
 			}
 			else if (remaining >= 4) {
 				remaining = remaining - 4;
-				nodes.push_back({ 0, node_hex32, false });
+				nodes.push_back({ nullptr, node_hex32, false });
 			}
 			else if (remaining >= 2) {
 				remaining = remaining - 2;
-				nodes.push_back({ 0, node_hex16, false });
+				nodes.push_back({ nullptr, node_hex16, false });
 			}
 			else if (remaining >= 1) {
 				remaining = remaining - 1;
-				nodes.push_back({ 0, node_hex8, false });
+				nodes.push_back({ nullptr, node_hex8, false });
 			}
 		}
 		sizeToNodes();
@@ -267,7 +267,7 @@ void uClass::resize(int mod) {
 	}
 }
 
-void uClass::copyPopup(int i, std::string toCopy, std::string id) {
+inline void uClass::copyPopup(int i, std::string toCopy, std::string id) {
 	std::string sID = "copyvar_" + id + std::to_string(i);
 
 	if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
@@ -284,17 +284,19 @@ void uClass::copyPopup(int i, std::string toCopy, std::string id) {
 	}
 }
 
-int uClass::drawVariableName(int i, nodeType type) {
+
+// TODO: cleanup the magic number hell below this point
+inline int uClass::drawVariableName(int i, nodeType type) {
 	auto& node = nodes[i];
 	ImVec2 nameSize = ImGui::CalcTextSize(node.name);
 	
-	auto& data = nodeData[type];
-	auto typeName = data.name;
+	auto& lData = nodeData[type];
+	auto typeName = lData.name;
 	ImVec2 typenameSize = ImGui::CalcTextSize(typeName);
 
-	ImGui::PushStyleColor(ImGuiCol_Text, data.color.Value);
+	ImGui::PushStyleColor(ImGuiCol_Text, lData.color.Value);
 	ImGui::SetCursorPos(ImVec2(180, 0));
-	ImGui::Text(typeName);
+	ImGui::Text("%s", typeName);
 	ImGui::PopStyleColor();
 
 	static char renameBuf[64] = { 0 };
@@ -330,25 +332,23 @@ int uClass::drawVariableName(int i, nodeType type) {
 	return typenameSize.x + nameSize.x;
 }
 
-void uClass::drawBool(int i, bool value) {
-	auto& node = nodes[i];
+inline void uClass::drawBool(int i, bool value) {
 
-	int xPad = drawVariableName(i, node_bool);
+	float xPad = static_cast<float>(drawVariableName(i, node_bool));
 
 	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
 	ImGui::Text(value ? "=  true" : "=  false");
 }
 
-void uClass::drawMatrix4x4(int i, Matrix4x4& value) {
-	auto& node = nodes[i];
+inline void uClass::drawMatrix4x4(int i, Matrix4x4& value) {
 
-	int xPad = drawVariableName(i, node_matrix4x4);
+	float xPad = static_cast<float>(drawVariableName(i, node_matrix4x4));
 	int mPad = 0;
 	int y = 0;
 
-	for (int i = 0; i < 4; i++) {
+	for (int ii = 0; ii < 4; ii++) {
 		for (int j = 0; j < 4; j++) {
-			float val = value.m[i][j];
+			float val = value.m[ii][j];
 			ImGui::SetCursorPos(ImVec2(180 + xPad + 30 + mPad, y));
 			ImGui::Text("%.3f", val);
 			mPad += 60;
@@ -359,8 +359,7 @@ void uClass::drawMatrix4x4(int i, Matrix4x4& value) {
 	}
 }
 
-void uClass::drawMatrix3x4(int i, Matrix3x4& value) {
-	auto& node = nodes[i];
+inline void uClass::drawMatrix3x4(int i, Matrix3x4& value) {
 
 	float xPad = static_cast<float>(drawVariableName(i, node_matrix3x4));
 	float mPad = 0;
@@ -379,8 +378,7 @@ void uClass::drawMatrix3x4(int i, Matrix3x4& value) {
 	}
 }
 
-void uClass::drawMatrix3x3(int i, Matrix3x3& value) {
-	auto& node = nodes[i];
+inline void uClass::drawMatrix3x3(int i, Matrix3x3& value) {
 
 	int xPad = drawVariableName(i, node_matrix3x3);
 	int mPad = 0;
@@ -399,91 +397,84 @@ void uClass::drawMatrix3x3(int i, Matrix3x3& value) {
 	}
 }
 
-void uClass::drawVector4(int i, Vector4& value) {
-	auto& node = nodes[i];
+inline void uClass::drawVector4(int i, Vector4& value) {
 
-	int xPad = drawVariableName(i, node_vector4);
+	const float xPad = static_cast<float>(drawVariableName(i, node_vector4));
 
 	std::string vec = std::format("{:.3f}, {:.3f}, {:.3f}, {:.3f}", value.x, value.y, value.z, value.w);
 	std::string toDraw = std::format("=  ({})", vec);
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
-	ImGui::Text(toDraw.c_str());
+	ImGui::SetCursorPos(ImVec2(180.f + xPad + 30.f, 0));
+	ImGui::Text("%s", toDraw.c_str());
 
 	copyPopup(i, vec, "vec4");
 }
 
-void uClass::drawVector3(int i, Vector3& value) {
-	auto& node = nodes[i];
+inline void uClass::drawVector3(int i, Vector3& value) {
 
-	int xPad = drawVariableName(i, node_vector3);
+	const float xPad = static_cast<float>(drawVariableName(i, node_vector3));
 
 	std::string vec = std::format("{:.3f}, {:.3f}, {:.3f}", value.x, value.y, value.z);
 	std::string toDraw = std::format("=  ({})", vec);
 	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
-	ImGui::Text(toDraw.c_str());
+	ImGui::Text("%s", toDraw.c_str());
 
 	copyPopup(i, vec, "vec3");
 }
 
-void uClass::drawVector2(int i, Vector2& value) {
-	auto& node = nodes[i];
+inline void uClass::drawVector2(int i, Vector2& value) {
 
-	int xPad = drawVariableName(i, node_vector2);
+	const float xPad = static_cast<float>(drawVariableName(i, node_vector2));
 
 	std::string vec = std::format("{:.3f}, {:.3f}", value.x, value.y);
 	std::string toDraw = std::format("=  ({})", vec);
 	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
-	ImGui::Text(toDraw.c_str());
+	ImGui::Text("%s", toDraw.c_str());
 
 	copyPopup(i, vec, "vec2");
 }
 
-void uClass::drawFloatVar(int i, float value) {
-	auto& node = nodes[i];
+inline void uClass::drawFloatVar(int i, float value) {
 
-	int xPad = drawVariableName(i, node_float);
+	const float xPad = static_cast<float>(drawVariableName(i, node_float));
 
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
+	ImGui::SetCursorPos(ImVec2(180.f + xPad + 30, 0));
 	ImGui::Text("=  %.3f", value);
 
 	copyPopup(i, std::to_string(value), "float");
 }
 
-void uClass::drawDoubleVar(int i, double value) {
-	auto& node = nodes[i];
+inline void uClass::drawDoubleVar(int i, double value) {
 
-	int xPad = drawVariableName(i, node_double);
+	const float xPad = static_cast<float>(drawVariableName(i, node_double));
 
 	std::string toDraw = std::format("=  {:.6f}", value);
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
-	ImGui::Text(toDraw.c_str());
+	ImGui::SetCursorPos(ImVec2(180.f + xPad + 30, 0));
+	ImGui::Text("%s", toDraw.c_str());
 
 	copyPopup(i, std::to_string(value), "double");
 }
 
-void uClass::drawInteger(int i, int64_t value, nodeType type) {
-	auto& node = nodes[i];
-	
-	int xPad = drawVariableName(i, type);
+inline void uClass::drawInteger(int i, int64_t value, nodeType type) {
 
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
+	const float xPad = static_cast<float>(drawVariableName(i, type));
+
+	ImGui::SetCursorPos(ImVec2(180.f + xPad + 30.f, 0));
 	ImGui::Text("=  %lld", value);
 
 	copyPopup(i, std::to_string(value), "int");
 }
 
-void uClass::drawUInteger(int i, uint64_t value, nodeType type) {
-	auto& node = nodes[i];
+inline void uClass::drawUInteger(int i, uint64_t value, nodeType type) {
 
-	int xPad = drawVariableName(i, type);
+	const float xPad = static_cast<float>(drawVariableName(i, type));
 
-	ImGui::SetCursorPos(ImVec2(180 + xPad + 30, 0));
+	ImGui::SetCursorPos(ImVec2(180.f + xPad + 30.f, 0));
 	ImGui::Text("=  %llu", value);
 
 	copyPopup(i, std::to_string(value), "uint");
 }
 
-void uClass::changeType(nodeType newType) {
+inline void uClass::changeType(nodeType newType) {
 	for (int i = 0; i < nodes.size(); i++) {
 		auto& node = nodes[i];
 		if (node.selected) {
@@ -494,7 +485,7 @@ void uClass::changeType(nodeType newType) {
 	}
 }
 
-void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) {
+inline void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) {
 	auto node = this->nodes[i];
 	auto oldSize = node.size;
 	auto typeSize = nodeData[newType].size;
@@ -507,15 +498,15 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 	while (sizeDiff > 0) {
 		if (sizeDiff >= 4) {
 			sizeDiff = sizeDiff - 4;
-			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex32, selectNew });
+			nodes.insert(nodes.begin() + i + inserted++, { nullptr, node_hex32, selectNew });
 		}
 		else if (sizeDiff >= 2) {
 			sizeDiff = sizeDiff - 2;
-			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex16, selectNew });
+			nodes.insert(nodes.begin() + i + inserted++, { nullptr, node_hex16, selectNew });
 		}
 		else if (sizeDiff >= 1) {
 			sizeDiff = sizeDiff - 1;
-			nodes.insert(nodes.begin() + i + inserted++, { 0, node_hex8, selectNew });
+			nodes.insert(nodes.begin() + i + inserted++, { nullptr, node_hex8, selectNew });
 		}
 	}
 
@@ -526,8 +517,8 @@ void uClass::changeType(int i, nodeType newType, bool selectNew, int* newNodes) 
 	}
 }
 
-void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
-	pad += 15;
+inline void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
+	cur_pad += 15;
 
 	ImColor color = ImColor(255, 162, 0);
 
@@ -562,7 +553,7 @@ void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 
 	ImVec2 textSize = ImGui::CalcTextSize(toDraw.c_str());
 
-	ImGui::SetCursorPos(ImVec2(455 + pad, 0));
+	ImGui::SetCursorPos(ImVec2(455 + cur_pad, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, color.Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
@@ -570,10 +561,10 @@ void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 	if (isPointer) {
 		if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
 			bool found = false;
-			for (int i = 0; i < g_Classes.size(); i++) {
-				auto& lClass = g_Classes[i];
+			for (size_t j = 0; j < g_Classes.size(); j++) {
+				auto& lClass = g_Classes[j];
 				if (lClass.address == num) {
-					g_SelectedClass = i;
+					g_SelectedClass = j;
 					found = true;
 					break;
 				}
@@ -625,20 +616,20 @@ void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 
 	if (isString) {
 		std::string stringDraw = std::format("'{}'", (char*)buf.data);
-		ImGui::SetCursorPos(ImVec2(455 + pad + textSize.x + 15, 0));
+		ImGui::SetCursorPos(ImVec2(455 + cur_pad + textSize.x + 15, 0));
 		ImGui::PushStyleColor(ImGuiCol_Text, ImColor(3, 252, 140).Value);
-		ImGui::Text(stringDraw.c_str());
+		ImGui::Text("%s", stringDraw.c_str());
 		ImGui::PopStyleColor();
 	}
 }
 
-void uClass::drawDouble(int i, double num) {
+inline void uClass::drawDouble(int i, double num) {
 	std::string toDraw = std::format("{:.3f}", num);
 	if (toDraw.size() > 20) {
 		toDraw = "#####";
 	}
 
-	pad += ImGui::CalcTextSize(toDraw.c_str()).x;
+	cur_pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 
 	ImGui::SetCursorPos(ImVec2(455, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
@@ -648,13 +639,13 @@ void uClass::drawDouble(int i, double num) {
 	copyPopup(i, toDraw, "dbl");
 }
 
-void uClass::drawFloat(int i, float num) {
+inline void uClass::drawFloat(int i, float num) {
 	std::string toDraw = std::format("{:.3f}", num);
 	if (toDraw.size() > 20) {
 		toDraw = "#####";
 	}
 
-	pad += ImGui::CalcTextSize(toDraw.c_str()).x;
+	cur_pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 
 	ImGui::SetCursorPos(ImVec2(455, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
@@ -664,38 +655,38 @@ void uClass::drawFloat(int i, float num) {
 	copyPopup(i, toDraw, "flt");
 }
 
-void uClass::drawNumber(int i, int64_t num) {
-	if (pad > 0) {
-		pad += 15;
+inline void uClass::drawNumber(int i, int64_t num) {
+	if (cur_pad > 0) {
+		cur_pad += 15;
 	}
 
 	std::string toDraw = std::to_string(num);
 
-	ImGui::SetCursorPos(ImVec2(455 + pad, 0));
+	ImGui::SetCursorPos(ImVec2(455 + cur_pad, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 218, 133).Value);
 	ImGui::Text(toDraw.c_str());
 	ImGui::PopStyleColor();
 
 	copyPopup(i, toDraw, "num");
 
-	pad += ImGui::CalcTextSize(toDraw.c_str()).x;
+	cur_pad += ImGui::CalcTextSize(toDraw.c_str()).x;
 }
 
-void uClass::drawOffset(int i, int pos) {
+inline void uClass::drawOffset(int i, int pos) {
 	ImGui::SetCursorPos(ImVec2(0, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.9f, .9f, .9f, 1.f));
 	ImGui::Text(ui::toHexString(pos, 4).c_str());
 	ImGui::PopStyleColor();
 }
 
-void uClass::drawAddress(int i, int pos) {
+inline void uClass::drawAddress(int i, int pos) {
 	ImGui::SetCursorPos(ImVec2(50, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.7f, .7f, .7f, 1.f));
 	ImGui::Text(ui::toHexString(this->address + pos, 16).c_str());
 	ImGui::PopStyleColor();
 }
 
-void uClass::drawBytes(int i, BYTE* data, int pos, int size) {
+inline void uClass::drawBytes(int i, BYTE* data, int pos, int size) {
 	for (int j = 0; j < size; j++) {
 		BYTE byte = data[pos];
 		ImGui::SetCursorPos(ImVec2(285 + j * 20, 0));
@@ -704,26 +695,26 @@ void uClass::drawBytes(int i, BYTE* data, int pos, int size) {
 	}
 }
 
-void uClass::drawStringBytes(int i, BYTE* data, int pos, int size) {
-	for (int j = 0; j < size; j++) {
-		BYTE byte = data[pos];
-		ImGui::SetCursorPos(ImVec2(180 + j * 12, 0));
+inline void uClass::drawStringBytes(int i, const BYTE* lData, int pos, int lSize) {
+	for (int j = 0; j < lSize; j++) {
+		BYTE byte = lData[pos];
+		ImGui::SetCursorPos(ImVec2(180.f + static_cast<float>(j) * 12.f, 0));
 		if (byte > 32 && byte < 127) {
 			ImGui::Text("%c", byte);
 		}
 		else if (byte != 0) {
-			ImGui::Text(".", byte);
+			ImGui::Text(".");
 		}
 		else {
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.3f, .3f, .3f, 1.f));
-			ImGui::Text(".", byte);
+			ImGui::Text(".");
 			ImGui::PopStyleColor();
 		}
 		pos++;
 	}
 }
 
-void uClass::drawControllers(int i, int counter) {
+inline void uClass::drawControllers(int i, int counter) {
 	auto& node = nodes[i];
 
 	ImVec2 parentSize = ImGui::GetContentRegionAvail();
@@ -736,11 +727,9 @@ void uClass::drawControllers(int i, int counter) {
 		}
 		else if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
 			int min = INT_MAX;
-			for (int j = 0; j < nodes.size(); j++) {
+			for (size_t j = 0; j < nodes.size(); j++) {
 				if (nodes[j].selected) {
-					if (j < min) {
-						min = j;
-					}
+					min = min(min, j);
 				}
 			}
 
@@ -756,8 +745,8 @@ void uClass::drawControllers(int i, int counter) {
 			}
 		}
 		else {
-			for (int j = 0; j < nodes.size(); j++) {
-				nodes[j].selected = false;
+			for (auto& lNode : nodes) {
+				lNode.selected = false;
 			}
 			nodes[i].selected = true;
 		}
@@ -770,14 +759,14 @@ void uClass::drawControllers(int i, int counter) {
 
 	if (ImGui::BeginPopup(sID.c_str())) {
 		if (!node.selected) {
-			for (int j = 0; j < nodes.size(); j++) {
-				nodes[j].selected = false;
+			for (auto& lNode : nodes) {
+				lNode.selected = false;
 			}
 			nodes[i].selected = true;
 		}
 
 		if (ImGui::BeginMenu("Change Type")) {
-			// the imvec2 just ensures the width of this menu
+			// the ImVec2 just ensures the width of this menu
 			if (ImGui::Selectable("Hex8", false, 0, ImVec2(100, 0))) {
 				changeType(node_hex8);
 			}
@@ -899,7 +888,7 @@ void uClass::drawControllers(int i, int counter) {
 	}
 }
 
-void uClass::drawNodes() {
+inline void uClass::drawNodes() {
 	mem::read(this->address, this->data, this->size);
 
 	ImVec2 parentSize = ImGui::GetContentRegionAvail();
@@ -927,20 +916,20 @@ void uClass::drawNodes() {
 			drawAddress(i, counter);
 
 			size_t lCounter = 0;
-			pad = 0;
+			cur_pad = 0;
 
 			// this kinda sucks
-			uintptr_t dataPos = (uintptr_t)data + counter;
+			auto dataPos = reinterpret_cast<std::uint8_t*>(data) + counter;
+
 			switch (node.type) {
 			case node_hex8:
 			{
 				drawStringBytes(i, data, counter, 1);
 				drawBytes(i, data, counter, 1);
 
-				auto num = *(int8_t*)dataPos;
+				auto num = *reinterpret_cast<int8_t*>(dataPos);
 				drawNumber(i, num);
 				drawHexNumber(i, num);
-
 				break;
 			}
 			case node_hex16:
@@ -948,87 +937,87 @@ void uClass::drawNodes() {
 				drawStringBytes(i, data, counter, 2);
 				drawBytes(i, data, counter, 2);
 
-				auto num = *(int16_t*)dataPos;
+				auto num = *reinterpret_cast<int16_t*>(dataPos);
 				drawNumber(i, num);
 				drawHexNumber(i, num);
 				break;
 			}
 			case node_hex32:
-				{
+			{
 				drawStringBytes(i, data, counter, 4);
 				drawBytes(i, data, counter, 4);
 
-				auto fNum = *(float*)dataPos;
+				auto fNum = *reinterpret_cast<float*>(dataPos);
 				drawFloat(i, fNum);
 
-				auto num = *(int32_t*)dataPos;
+				auto num = *reinterpret_cast<int32_t*>(dataPos);
 				drawNumber(i, num);
 				drawHexNumber(i, num, &clickedPointer);
 				break;
-				}
+			}
 			case node_hex64:
 			{
 				drawStringBytes(i, data, counter, 8);
 				drawBytes(i, data, counter, 8);
 
-				auto dNum = *(double*)dataPos;
+				auto dNum = *reinterpret_cast<double*>(dataPos);
 				drawDouble(i, dNum);
 
-				auto num = *(int64_t*)dataPos;
+				auto num = *reinterpret_cast<int64_t*>(dataPos);
 				drawNumber(i, num);
 				drawHexNumber(i, num, &clickedPointer);
 				break;
 			}
 			case node_int64:
-				drawInteger(i, *(int64_t*)dataPos, node_int64);
+				drawInteger(i, *reinterpret_cast<int64_t*>(dataPos), node_int64);
 				break;
 			case node_int32:
-				drawInteger(i, *(int32_t*)dataPos, node_int32);
+				drawInteger(i, *reinterpret_cast<int32_t*>(dataPos), node_int32);
 				break;
 			case node_int16:
-				drawInteger(i, *(int16_t*)dataPos, node_int16);
+				drawInteger(i, *reinterpret_cast<int16_t*>(dataPos), node_int16);
 				break;
 			case node_int8:
-				drawInteger(i, *(int8_t*)dataPos, node_int8);
+				drawInteger(i, *reinterpret_cast<int8_t*>(dataPos), node_int8);
 				break;
 			case node_uint64:
-				drawUInteger(i, *(uint64_t*)dataPos, node_uint64);
+				drawUInteger(i, *reinterpret_cast<uint64_t*>(dataPos), node_uint64);
 				break;
 			case node_uint32:
-				drawUInteger(i, *(uint32_t*)dataPos, node_uint32);
+				drawUInteger(i, *reinterpret_cast<uint32_t*>(dataPos), node_uint32);
 				break;
 			case node_uint16:
-				drawUInteger(i, *(uint16_t*)dataPos, node_uint16);
+				drawUInteger(i, *reinterpret_cast<uint16_t*>(dataPos), node_uint16);
 				break;
 			case node_uint8:
-				drawUInteger(i, *(uint8_t*)dataPos, node_uint8);
+				drawUInteger(i, *reinterpret_cast<uint8_t*>(dataPos), node_uint8);
 				break;
 			case node_float:
-				drawFloatVar(i, *(float*)dataPos);
+				drawFloatVar(i, *reinterpret_cast<float*>(dataPos));
 				break;
 			case node_double:
-				drawDoubleVar(i, *(double*)dataPos);
+				drawDoubleVar(i, *reinterpret_cast<double*>(dataPos));
 				break;
 			case node_vector4:
-				drawVector4(i, *(Vector4*)dataPos);
+				drawVector4(i, *reinterpret_cast<Vector4*>(dataPos));
 				break;
 			case node_vector3:
-				drawVector3(i, *(Vector3*)dataPos);
+				drawVector3(i, *reinterpret_cast<Vector3*>(dataPos));
 				break;
 			case node_vector2:
-				drawVector2(i, *(Vector2*)dataPos);
+				drawVector2(i, *reinterpret_cast<Vector2*>(dataPos));
 				break;
 			case node_matrix4x4:
-				drawMatrix4x4(i, *(Matrix4x4*)dataPos);
+				drawMatrix4x4(i, *reinterpret_cast<Matrix4x4*>(dataPos));
 				break;
 			case node_matrix3x4:
-				drawMatrix3x4(i, *(Matrix3x4*)dataPos);
+				drawMatrix3x4(i, *reinterpret_cast<Matrix3x4*>(dataPos));
 				break;
 			case node_matrix3x3:
-				drawMatrix3x3(i, *(Matrix3x3*)dataPos);
+				drawMatrix3x3(i, *reinterpret_cast<Matrix3x3*>(dataPos));
 				break;
 			case node_bool:
-				drawBool(i, *(bool*)dataPos);
+				drawBool(i, *reinterpret_cast<bool*>(dataPos));
 				break;
 			}
 
@@ -1036,9 +1025,7 @@ void uClass::drawNodes() {
 
 			ImGui::EndChild();
 
-			ImVec2 endPos = ImGui::GetCursorPos();
-
-			if (node.type < 0 || node.type >= node_max) {
+			if (node.type >= node_max) {
 				continue;
 			}
 
@@ -1061,7 +1048,7 @@ void uClass::drawNodes() {
 	}
 }
 
-void initClasses(bool isX32) {
+inline void initClasses(bool isX32) {
 	if (g_Classes.empty() || isX32 != mem::x32) {
 		mem::x32 = isX32;
 		g_Classes = { uClass(50) };
