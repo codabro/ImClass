@@ -325,12 +325,22 @@ std::vector<funcExport> mem::gatherRemoteExports(uintptr_t moduleBase)
 
 	exports.reserve(exportDir.NumberOfNames);
 
-    // for slower read methods than just ReadProcessMemory, read the entire module at once or scatter read; this code is fine with rpm, however.
+    // TODO: refactor this to use less individual read calls (most names end up in the same pages anyway...)
 	for (DWORD i = 0; i < exportDir.NumberOfNames; ++i) {
 		char nameBuffer[256] = { 0 };
 		DWORD nameRVA = nameRVAs[i];
 
-		if (!read(moduleBase + nameRVA, nameBuffer, 255)) {
+        DWORD readSize = 255;
+
+        if (i + 1 < exportDir.NumberOfNames) {
+            DWORD nextNameRVA = nameRVAs[i + 1];
+            DWORD NameDelta = nextNameRVA - nameRVA;
+            if (NameDelta > 0 && NameDelta < 255)
+                readSize = NameDelta; // don't need to read more than this delta
+        }
+
+
+		if (!read(moduleBase + nameRVA, nameBuffer, readSize)) {
 			continue;
 		}
 
