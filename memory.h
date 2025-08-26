@@ -39,7 +39,7 @@ struct RTTICompleteObjectLocator {
     DWORD selfOffset;
 };
 
-typedef const struct RTTIClassHierarchyDescriptor {
+struct RTTIClassHierarchyDescriptor {
     DWORD signature;
     DWORD attributes;
     DWORD numBaseClasses;
@@ -59,21 +59,21 @@ struct funcExport
 };
 
 namespace mem {
-    std::vector<processSnapshot> processes;
-    HANDLE memHandle;
-    DWORD pid;
-    std::vector<moduleInfo> moduleList;
-    std::unordered_map<uintptr_t, std::string> g_ExportMap;
-    bool x32 = false;
+    inline std::vector<processSnapshot> processes;
+    inline HANDLE memHandle;
+    inline DWORD g_pid;
+    inline std::vector<moduleInfo> moduleList;
+    inline std::unordered_map<uintptr_t, std::string> g_ExportMap;
+    inline bool x32 = false;
 
     bool getProcessList();
     HANDLE openHandle(DWORD pid);
     bool getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info);
     void getModules();
-    void getSections(moduleInfo& info, std::vector<moduleSection>& dest);
+    void getSections(const moduleInfo& info, std::vector<moduleSection>& dest);
     bool isPointer(uintptr_t address, pointerInfo* info);
     bool rttiInfo(uintptr_t address, std::string& out);
-    std::vector<funcExport> gatherRemoteExports(uintptr_t remoteBaseAddress);
+    std::vector<funcExport> gatherRemoteExports(uintptr_t moduleBase);
     void gatherExports();
     uintptr_t getExport(const std::string& moduleName, const std::string& exportName);
 
@@ -82,15 +82,15 @@ namespace mem {
     bool initProcess(DWORD pid);
     bool isX32(HANDLE handle);
 
-    bool activeProcess = false;
-    std::chrono::steady_clock::time_point lastCheck = std::chrono::steady_clock::now();
-    constexpr std::chrono::milliseconds PROCESS_CHECK_INTERVAL{ 1000 };
+    inline bool activeProcess = false;
+    inline std::chrono::steady_clock::time_point lastCheck = std::chrono::steady_clock::now();
+    inline constexpr std::chrono::milliseconds PROCESS_CHECK_INTERVAL{ 1000 };
 
     bool isProcessAlive();
     void cleanDeadProcess();
 }
 
-bool mem::isX32(HANDLE handle) {
+inline bool mem::isX32(HANDLE handle) {
     BOOL wow64 = FALSE;
     if (!IsWow64Process(handle, &wow64)) {
         return false;
@@ -101,7 +101,7 @@ bool mem::isX32(HANDLE handle) {
 
 template <typename T>
 T Read(uintptr_t address);
-bool mem::rttiInfo(uintptr_t address, std::string& out) {
+inline bool mem::rttiInfo(uintptr_t address, std::string& out) {
     uintptr_t objectLocatorPtr = Read<uintptr_t>(address - sizeof(void*));
     if (!objectLocatorPtr) {
         return false;
@@ -113,7 +113,7 @@ bool mem::rttiInfo(uintptr_t address, std::string& out) {
     auto hierarchy = Read<RTTIClassHierarchyDescriptor>(baseModule + objectLocator.hierarchyDescriptorOffset);
     uintptr_t classArray = baseModule + hierarchy.pBaseClassArray;
 
-    for (int i = 0; i < hierarchy.numBaseClasses; i++) {
+    for (DWORD i = 0; i < hierarchy.numBaseClasses; i++) {
         uintptr_t classDescriptor = baseModule + Read<DWORD>(classArray + i * sizeof(DWORD));
         DWORD typeDescriptorOffset = Read<DWORD>(classDescriptor);
         auto typeDescriptor = Read<TypeDescriptor>(baseModule + typeDescriptorOffset);
@@ -132,31 +132,29 @@ bool mem::rttiInfo(uintptr_t address, std::string& out) {
     return true;
 }
 
-bool mem::isPointer(uintptr_t address, pointerInfo* info) {
-    for (int i = 0; i < moduleList.size(); i++) {
-        auto& module = moduleList[i];
-        if (module.base <= address && address <= module.base + module.size) {
-            info->moduleName = module.name;
-            for (int j = 0; j < module.sections.size(); j++) {
-                auto& section = module.sections[j];
-                if (section.base <= address && address < section.base + section.size) {
-                    memcpy(info->section, section.name, 8);
-                    break;
-                }
-            }
-            return true;
-        }
-    }
+inline bool mem::isPointer(uintptr_t address, pointerInfo* info) {
+	for (auto& module : moduleList) {
+		if (module.base <= address && address <= module.base + module.size) {
+			info->moduleName = module.name;
+			for (auto& section : module.sections) {
+				if (section.base <= address && address < section.base + section.size) {
+					memcpy(info->section, section.name, 8);
+					break;
+				}
+			}
+			return true;
+		}
+	}
 
     MEMORY_BASIC_INFORMATION mbi;
-    if (VirtualQueryEx(memHandle, (LPCVOID)address, &mbi, sizeof(mbi))) {
+    if (VirtualQueryEx(memHandle, reinterpret_cast<LPCVOID>(address), &mbi, sizeof(mbi))) {
         return (mbi.Type == MEM_PRIVATE && mbi.State == MEM_COMMIT);
     }
 
     return false;
 }
 
-bool mem::getProcessList() {
+inline bool mem::getProcessList() {
     processes.clear();
 
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -186,10 +184,10 @@ bool mem::getProcessList() {
     return true;
 }
 
-void mem::getModules() {
+inline void mem::getModules() {
     moduleList.clear();
 
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, g_pid);
     if (snapshot == INVALID_HANDLE_VALUE) {
         return;
     }
@@ -215,7 +213,7 @@ void mem::getModules() {
     return;
 }
 
-void mem::getSections(moduleInfo& info, std::vector<moduleSection>& dest) {
+inline void mem::getSections(const moduleInfo& info, std::vector<moduleSection>& dest) {
     BYTE buf[4096];
     read(info.base, buf, sizeof(buf));
 
@@ -223,7 +221,7 @@ void mem::getSections(moduleInfo& info, std::vector<moduleSection>& dest) {
     auto ntHeader = (IMAGE_NT_HEADERS*)(buf + dosHeader->e_lfanew);
     auto sectionHeader = IMAGE_FIRST_SECTION(ntHeader);
 
-    for (int i = 0; i < ntHeader->FileHeader.NumberOfSections; i++) {
+    for (WORD i = 0; i < ntHeader->FileHeader.NumberOfSections; i++) {
         auto section = sectionHeader[i];
         moduleSection sectionInfo;
         sectionInfo.base = info.base + section.VirtualAddress;
@@ -233,7 +231,7 @@ void mem::getSections(moduleInfo& info, std::vector<moduleSection>& dest) {
     }
 }
 
-bool mem::getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info) {
+inline bool mem::getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info) {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
     if (snapshot == INVALID_HANDLE_VALUE) {
         return false;
@@ -257,22 +255,22 @@ bool mem::getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info) 
     return false;
 }
 
-HANDLE mem::openHandle(DWORD pid) {
+inline HANDLE mem::openHandle(const DWORD pid) {
     memHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, pid);
     return memHandle;
 }
 
-bool mem::read(uintptr_t address, void* buf, uintptr_t size) {
-    size_t sizeRead;
-    return ReadProcessMemory(memHandle, (void*)address, buf, size, &sizeRead);
+inline bool mem::read(uintptr_t address, void* buf, uintptr_t size) {
+    SIZE_T sizeRead;
+    return ReadProcessMemory(memHandle, reinterpret_cast<LPCVOID>(address), buf, size, &sizeRead);
 }
 
-bool mem::write(uintptr_t address, const void* buf, uintptr_t size) {
-    size_t sizeWritten;
-    return WriteProcessMemory(memHandle, (void*)address, buf, size, &sizeWritten);
+inline bool mem::write(uintptr_t address, const void* buf, uintptr_t size) {
+    SIZE_T sizeWritten;
+    return WriteProcessMemory(memHandle, reinterpret_cast<LPVOID>(address), buf, size, &sizeWritten);
 }
 
-std::vector<funcExport> mem::gatherRemoteExports(uintptr_t moduleBase)
+inline std::vector<funcExport> mem::gatherRemoteExports(uintptr_t moduleBase)
 {
 	std::vector<funcExport> exports;
 	IMAGE_DOS_HEADER dosHeader;
@@ -369,13 +367,13 @@ std::vector<funcExport> mem::gatherRemoteExports(uintptr_t moduleBase)
 	return exports;
 }
 
-void mem::gatherExports()
+inline void mem::gatherExports()
 {
 	g_ExportMap.clear();
 
 	for (auto& module : moduleList) {
 		char modulePath[MAX_PATH] = { 0 };
-		if (K32GetModuleFileNameExA(memHandle, (HMODULE)module.base, modulePath, MAX_PATH)) {
+		if (K32GetModuleFileNameExA(memHandle, reinterpret_cast<HMODULE>(module.base), modulePath, MAX_PATH)) {
 			auto exports = gatherRemoteExports(module.base);
 
 			for (const auto& exp : exports) {
@@ -385,7 +383,7 @@ void mem::gatherExports()
 	}
 }
 
-uintptr_t mem::getExport(const std::string& moduleName, const std::string& exportName)
+inline uintptr_t mem::getExport(const std::string& moduleName, const std::string& exportName)
 {
 	for (auto& module : moduleList) {
 		if (_stricmp(module.name.c_str(), moduleName.c_str()) == 0) {
@@ -401,7 +399,7 @@ uintptr_t mem::getExport(const std::string& moduleName, const std::string& expor
 	return 0;
 }
 
-bool mem::isProcessAlive()
+inline bool mem::isProcessAlive()
 {
 	if (!memHandle || memHandle == INVALID_HANDLE_VALUE)
         return false;
@@ -424,7 +422,7 @@ bool mem::isProcessAlive()
 }
 
 // used internally by ui::cleanDeadProcess
-void mem::cleanDeadProcess() {
+inline void mem::cleanDeadProcess() {
 	if (memHandle && memHandle != INVALID_HANDLE_VALUE) {
 		CloseHandle(memHandle);
 		memHandle = nullptr;
@@ -432,13 +430,13 @@ void mem::cleanDeadProcess() {
 
 	moduleList.clear();
 	g_ExportMap.clear();
-	pid = 0;
+	g_pid = 0;
 	activeProcess = false;
 }
 
 extern void initClasses(bool);
-bool mem::initProcess(DWORD pid) {
-    mem::pid = pid;
+inline bool mem::initProcess(DWORD pid) {
+    mem::g_pid = pid;
     if (openHandle(pid)) {
         getModules();
         bool newX32 = isX32(memHandle);

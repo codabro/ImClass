@@ -88,7 +88,7 @@ inline uintptr_t addressParser::parseInput(const char* str) {
 				if (curToken.find(ending) != std::string::npos) {
 					std::wstring token(curToken.begin(), curToken.end());
 					moduleInfo info;
-					if (mem::getModuleInfo(mem::pid, token.c_str(), &info)) {
+					if (mem::getModuleInfo(mem::g_pid, token.c_str(), &info)) {
 						value = info.base;
 						isModule = true;
 					}

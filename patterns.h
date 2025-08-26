@@ -220,7 +220,7 @@ inline std::optional<PatternScanResult> pattern::scanPattern(PatternInfo& patter
 	}
 
 	std::wstring wideName(dllName.begin(), dllName.end()); // windows api requires widestring, maybe change input type?
-	DWORD pid = mem::pid;
+	DWORD pid = mem::g_pid;
 
 	if (!pid)
 		return std::nullopt;
