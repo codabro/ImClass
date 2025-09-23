@@ -1,5 +1,7 @@
 # ImClass Memory Viewer
 
+<img width="1209" height="499" alt="image" src="https://github.com/user-attachments/assets/bfa9c4f0-def8-4a83-84e4-e76b6bfab6a5" />
+
 
 Inspired by [ReClass.NET](https://github.com/ReClassNET/ReClass.NET)
 
