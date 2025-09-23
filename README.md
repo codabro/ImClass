@@ -31,7 +31,7 @@ Using [Dear ImGui](https://github.com/ocornut/imgui) for immediate-mode renderin
 
 ## Tips
 
-Math operations work inside the address bar (ex. "**ntdll.dll + 0x4000**" or "**ntdll.dll + 4100 - 0x50 + 50**" give the same resulting address)
+Math operations work inside the address bar (ex. "**ntdll.dll + 0x4000**" or "**ntdll.dll + 4100 - 0x50 - 50**" give the same resulting address)
 
 All numbers passed into the address bar are assumed to be hexadecimal (0x1000 == 1000 when searching).
 
