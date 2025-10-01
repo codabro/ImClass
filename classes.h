@@ -536,7 +536,7 @@ inline void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 				toDraw = "[EXPORT] " + exportIt->second + " " + toDraw;
 			}
 			else {
-				toDraw = std::format("[{}] {} {}", info.section, info.moduleName.c_str(), toDraw.c_str());
+				toDraw = std::format("[{}] {} {}", info.section, info.moduleName, toDraw);
 			}
 		}
 
