@@ -124,7 +124,7 @@ public:
 	int varCounter = 0;
 	size_t size;
 	BYTE* data = 0;
-	int cur_pad = 0;
+	float cur_pad = 0;
 
 	uClass(int nodeCount, bool incrementCounter = true) {
 		size = 0;
@@ -160,7 +160,7 @@ public:
 	void drawNodes();
 	void drawStringBytes(int i, const BYTE* data, int pos, int size);
 	void drawOffset(int i, int pos);
-	void drawAddress(int i, int pos);
+	void drawAddress(int i, int pos) const;
 	void drawBytes(int i, BYTE* data, int pos, int size);
 	void drawNumber(int i, int64_t num);
 	void drawFloat(int i, float num);
@@ -249,19 +249,19 @@ inline void uClass::resize(int mod) {
 		while (remaining > 0) {
 			if (remaining >= 8) {
 				remaining = remaining - 8;
-				nodes.push_back({ nullptr, node_hex64, false });
+				nodes.emplace_back(nodeBase(nullptr, node_hex64, false));
 			}
 			else if (remaining >= 4) {
 				remaining = remaining - 4;
-				nodes.push_back({ nullptr, node_hex32, false });
+				nodes.emplace_back(nodeBase(nullptr, node_hex32, false));
 			}
 			else if (remaining >= 2) {
 				remaining = remaining - 2;
-				nodes.push_back({ nullptr, node_hex16, false });
+				nodes.emplace_back(nodeBase(nullptr, node_hex16, false));
 			}
 			else if (remaining >= 1) {
 				remaining = remaining - 1;
-				nodes.push_back({ nullptr, node_hex8, false });
+				nodes.emplace_back(nodeBase(nullptr, node_hex8, false));
 			}
 		}
 		sizeToNodes();
@@ -470,7 +470,7 @@ inline void uClass::drawUInteger(int i, uint64_t value, nodeType type) {
 }
 
 inline void uClass::changeType(nodeType newType) {
-	for (int i = 0; i < nodes.size(); i++) {
+	for (int i = 0; i < static_cast<int>(nodes.size()); i++) {
 		auto& node = nodes[i];
 		if (node.selected) {
 			int newNodes;
@@ -550,7 +550,7 @@ inline void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 
 	ImGui::SetCursorPos(ImVec2(455 + cur_pad, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, color.Value);
-	ImGui::Text(toDraw.c_str());
+	ImGui::Text("%s", toDraw.c_str());
 	ImGui::PopStyleColor();
 
 	if (isPointer) {
@@ -602,8 +602,8 @@ inline void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 
 	auto buf = Read<readBuf<64>>(num);
 	bool isString = true;
-	for (int i = 0; i < 4; i++) {
-		if (buf.data[i] < 21 || buf.data[i] > 126) {
+	for (int it = 0; it < 4; it++) {
+		if (buf.data[it] < 21 || buf.data[it] > 126) {
 			isString = false;
 			break;
 		}
@@ -611,7 +611,7 @@ inline void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 
 	if (isString) {
 		std::string stringDraw = std::format("'{}'", (char*)buf.data);
-		ImGui::SetCursorPos(ImVec2(455 + cur_pad + textSize.x + 15, 0));
+		ImGui::SetCursorPos(ImVec2(455.f + cur_pad + textSize.x + 15, 0));
 		ImGui::PushStyleColor(ImGuiCol_Text, ImColor(3, 252, 140).Value);
 		ImGui::Text("%s", stringDraw.c_str());
 		ImGui::PopStyleColor();
@@ -628,7 +628,7 @@ inline void uClass::drawDouble(int i, double num) {
 
 	ImGui::SetCursorPos(ImVec2(455, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
-	ImGui::Text(toDraw.c_str());
+	ImGui::Text("%s", toDraw.c_str());
 	ImGui::PopStyleColor();
 
 	copyPopup(i, toDraw, "dbl");
@@ -644,7 +644,7 @@ inline void uClass::drawFloat(int i, float num) {
 
 	ImGui::SetCursorPos(ImVec2(455, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(163, 255, 240).Value);
-	ImGui::Text(toDraw.c_str());
+	ImGui::Text("%s", toDraw.c_str());
 	ImGui::PopStyleColor();
 
 	copyPopup(i, toDraw, "flt");
@@ -659,7 +659,7 @@ inline void uClass::drawNumber(int i, int64_t num) {
 
 	ImGui::SetCursorPos(ImVec2(455 + cur_pad, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 218, 133).Value);
-	ImGui::Text(toDraw.c_str());
+	ImGui::Text("%s", toDraw.c_str());
 	ImGui::PopStyleColor();
 
 	copyPopup(i, toDraw, "num");
@@ -674,10 +674,10 @@ inline void uClass::drawOffset(int i, int pos) {
 	ImGui::PopStyleColor();
 }
 
-inline void uClass::drawAddress(int i, int pos) {
+inline void uClass::drawAddress(int i, int pos) const {
 	ImGui::SetCursorPos(ImVec2(50, 0));
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.7f, .7f, .7f, 1.f));
-	ImGui::Text(ui::toHexString(this->address + pos, 16).c_str());
+	ImGui::Text("%s", ui::toHexString(this->address + pos, 16).c_str());
 	ImGui::PopStyleColor();
 }
 
@@ -685,7 +685,7 @@ inline void uClass::drawBytes(int i, BYTE* data, int pos, int size) {
 	for (int j = 0; j < size; j++) {
 		BYTE byte = data[pos];
 		ImGui::SetCursorPos(ImVec2(285 + j * 20, 0));
-		ImGui::Text(ui::toHexString(byte, 2).c_str());
+		ImGui::Text("%s", ui::toHexString(byte, 2).c_str());
 		pos++;
 	}
 }
@@ -724,7 +724,7 @@ inline void uClass::drawControllers(int i, int counter) {
 			int min = INT_MAX;
 			for (size_t j = 0; j < nodes.size(); j++) {
 				if (nodes[j].selected) {
-					min = min(min, j);
+					min = min(min, static_cast<int>(j));
 				}
 			}
 
@@ -870,7 +870,7 @@ inline void uClass::drawControllers(int i, int counter) {
 		}
 
 		if (ImGui::Selectable("Delete")) {
-			for (int j = nodes.size() - 1; j >= 0; j--) {
+			for (int j = static_cast<int>(nodes.size()) - 1; j >= 0; j--) {
 				if (nodes[j].selected) {
 					nodes.erase(nodes.begin() + j);
 				}
@@ -891,7 +891,7 @@ inline void uClass::drawNodes() {
 	uintptr_t clickedPointer = 0;
 
 	ImGuiListClipper clipper;
-	clipper.Begin(nodes.size());
+	clipper.Begin( static_cast<int>(nodes.size()) );
 	while (clipper.Step()) {
 		int counter = 0;
 		for (int i = 0; i < clipper.DisplayStart; i++) {
