@@ -179,9 +179,11 @@ public:
 	void drawVector4(int i, Vector4& value);
 	void drawVector3(int i, Vector3& value);
 	void drawVector2(int i, Vector2& value);
-	void drawMatrix4x4(int i, Matrix4x4& value);
-	void drawMatrix3x4(int i, Matrix3x4& value);
-	void drawMatrix3x3(int i, Matrix3x3& value);
+	template<typename MatrixType>
+	void drawMatrixText(float xPadding, int rows, int columns, const MatrixType& value);
+	void drawMatrix4x4(int i, const Matrix4x4& value);
+	void drawMatrix3x4(int i, const Matrix3x4& value);
+	void drawMatrix3x3(int i, const Matrix3x3& value);
 	void drawBool(int i, bool value);
 
 	std::string exportClass();
@@ -340,37 +342,30 @@ inline void uClass::drawBool(int i, bool value) {
 	ImGui::Text(value ? "=  true" : "=  false");
 }
 
-inline void uClass::drawMatrix4x4(int i, Matrix4x4& value) {
+template<typename MatrixType>
+inline void uClass::drawMatrixText(float xPadding, int rows, int columns, const MatrixType& value)
+{
+	// for matrices, use the largest rendered number to decide the sizing for all
+	// it may not look perfect in all scenarios, but it is the most logical solution for most use cases
 
-	float xPad = static_cast<float>(drawVariableName(i, node_matrix4x4));
-	int mPad = 0;
-	int y = 0;
-
-	for (int ii = 0; ii < 4; ii++) {
-		for (int j = 0; j < 4; j++) {
-			float val = value.m[ii][j];
-			ImGui::SetCursorPos(ImVec2(180 + xPad + 30 + mPad, y));
-			ImGui::Text("%.3f", val);
-			mPad += 60;
-		}
-
-		y += 15;
-		mPad = 0;
-	}
-}
-
-inline void uClass::drawMatrix3x4(int i, Matrix3x4& value) {
-
-	float xPad = static_cast<float>(drawVariableName(i, node_matrix3x4));
 	float mPad = 0;
+	float maxWidth = 0.f;
 	float y = 0;
 
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 4; j++) {
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < columns; j++) {
 			float val = value.m[i][j];
-			ImGui::SetCursorPos(ImVec2(180 + xPad + 30 + mPad, y));
+			float currentWidth = ImGui::CalcTextSize(std::format("{:.3f}", val).c_str()).x;
+			maxWidth = max(currentWidth, maxWidth);
+		}
+	}
+
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < columns; j++) {
+			float val = value.m[i][j];
+			ImGui::SetCursorPos(ImVec2(180 + xPadding + 30 + mPad, y));
 			ImGui::Text("%.3f", val);
-			mPad += 60;
+			mPad += maxWidth;
 		}
 
 		y += 15;
@@ -378,23 +373,23 @@ inline void uClass::drawMatrix3x4(int i, Matrix3x4& value) {
 	}
 }
 
-inline void uClass::drawMatrix3x3(int i, Matrix3x3& value) {
 
-	int xPad = drawVariableName(i, node_matrix3x3);
-	int mPad = 0;
-	int y = 0;
+inline void uClass::drawMatrix4x4(int i, const Matrix4x4& value) {
 
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			float val = value.m[i][j];
-			ImGui::SetCursorPos(ImVec2(180 + xPad + 30 + mPad, y));
-			ImGui::Text("%.3f", val);
-			mPad += 60;
-		}
+	float xPad = static_cast<float>(drawVariableName(i, node_matrix3x4));
+	drawMatrixText(xPad, 4, 4, value);
+}
 
-		y += 15;
-		mPad = 0;
-	}
+inline void uClass::drawMatrix3x4(int i, const Matrix3x4& value) {
+
+	float xPad = static_cast<float>(drawVariableName(i, node_matrix3x4));
+	drawMatrixText(xPad, 3, 4, value);
+}
+
+inline void uClass::drawMatrix3x3(int i, const Matrix3x3& value) {
+
+	float xPad = static_cast<float>(drawVariableName(i, node_matrix3x3));
+	drawMatrixText(xPad, 3, 3, value);
 }
 
 inline void uClass::drawVector4(int i, Vector4& value) {
