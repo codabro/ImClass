@@ -31,12 +31,13 @@ jobs:
       # Add additional options to the MSBuild command line here (like platform or verbosity level).
       # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
-    - name: Update Release
+    - name: Create Prerelease
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: latest
-        name: ${{ steps.commit.outputs.message }}
+        tag_name: build-${{ github.run_number }}-${{ github.sha }}
+        name: Build ${{ github.run_number }} - ${{ github.event.head_commit.message }}
         files: x64/Release/ImClass.exe
         prerelease: true
         draft: false
+        generate_release_notes: true
