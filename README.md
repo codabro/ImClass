@@ -40,3 +40,7 @@ Adding a library name to the address bar will result in its base address being u
 To view an export, put the library name appended by an exclamation mark and the export name into the address bar (ex. **kernel32.dll!ReadProcessMemory** or **kernel32.dll!WriteProcessMemory**)
 
 Entering an invalid operation into the address bar will just result in a zeroed out output currently.
+
+## Contributing
+Feel free to contribute anything you'd like, and it will be accepted it as long as we consider it beneficial to the project.
+This includes, but isn't limited to: new features, refactoring existing features and fixing bugs.
