@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <cstdint>
 #include <regex>
+#include <imgui/backends/imgui_impl_dx11.h>
 #include <imgui/imgui_internal.h>
 
 #include "patterns.h"

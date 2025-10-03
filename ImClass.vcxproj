@@ -77,7 +77,7 @@
     <IncludePath>$(ProjectDir)include;$(ProjectDir);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir)include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)include;$(ProjectDir);$(ProjectDir)include\imgui;$(ProjectDir)include\imgui\backends;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(ProjectDir)include;$(ProjectDir);$(IncludePath)</IncludePath>
@@ -147,11 +147,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="include\imgui\backends\imgui_impl_dx11.cpp" />
+    <ClCompile Include="include\imgui\backends\imgui_impl_win32.cpp" />
     <ClCompile Include="include\imgui\imgui.cpp" />
     <ClCompile Include="include\imgui\imgui_demo.cpp" />
     <ClCompile Include="include\imgui\imgui_draw.cpp" />
-    <ClCompile Include="include\imgui\imgui_impl_dx11.cpp" />
-    <ClCompile Include="include\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="include\imgui\imgui_tables.cpp" />
     <ClCompile Include="include\imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
@@ -159,10 +159,10 @@
   <ItemGroup>
     <ClInclude Include="classes.h" />
     <ClInclude Include="directx.h" />
+    <ClInclude Include="include\imgui\backends\imgui_impl_dx11.h" />
+    <ClInclude Include="include\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="include\imgui\imconfig.h" />
     <ClInclude Include="include\imgui\imgui.h" />
-    <ClInclude Include="include\imgui\imgui_impl_dx11.h" />
-    <ClInclude Include="include\imgui\imgui_impl_win32.h" />
     <ClInclude Include="include\imgui\imgui_internal.h" />
     <ClInclude Include="include\imgui\imstb_rectpack.h" />
     <ClInclude Include="include\imgui\imstb_textedit.h" />
