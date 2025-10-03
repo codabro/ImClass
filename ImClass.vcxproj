@@ -80,7 +80,7 @@
     <IncludePath>$(ProjectDir)include;$(ProjectDir);$(ProjectDir)include\imgui;$(ProjectDir)include\imgui\backends;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)include;$(ProjectDir);$(ProjectDir)include\imgui;$(ProjectDir)include\imgui\backends;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
