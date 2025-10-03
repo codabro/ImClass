@@ -36,7 +36,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: latest
-        name: Latest Build
+        name: ${{ steps.commit.outputs.message }}
         files: x64/Release/ImClass.exe
-        prerelease: false
+        prerelease: true
         draft: false
