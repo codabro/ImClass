@@ -42,5 +42,5 @@ To view an export, put the library name appended by an exclamation mark and the 
 Entering an invalid operation into the address bar will just result in a zeroed out output currently.
 
 ## Contributing
-Feel free to contribute anything you'd like, and it will be accepted it as long as we consider it beneficial to the project.
+Feel free to contribute anything you'd like, and it will be accepted as long as we consider it beneficial to the project.
 This includes, but isn't limited to: new features, refactoring existing features and fixing bugs.
