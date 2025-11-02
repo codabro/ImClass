@@ -5,6 +5,7 @@
 #include <vector>
 #include <tlhelp32.h>
 #include <unordered_map>
+#include <winternl.h>
 #include <Psapi.h>
 
 struct processSnapshot {
@@ -68,6 +69,7 @@ namespace mem {
 
     bool getProcessList();
     HANDLE openHandle(DWORD pid);
+    uintptr_t getPEB();
     bool getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info);
     void getModules();
     void getSections(const moduleInfo& info, std::vector<moduleSection>& dest);
@@ -231,26 +233,104 @@ inline void mem::getSections(const moduleInfo& info, std::vector<moduleSection>&
     }
 }
 
+
+
+typedef NTSTATUS(*_NtQueryInformationProcess)(IN HANDLE ProcessHandle,
+	IN PROCESSINFOCLASS ProcessInformationClass,
+	OUT PVOID ProcessInformation,
+	IN ULONG ProcessInformationLength,
+	OUT PULONG ReturnLength OPTIONAL);
+
+inline uintptr_t mem::getPEB()
+{
+    PROCESS_BASIC_INFORMATION processInformation;
+    ULONG written = 0;
+
+    HMODULE hNtdll = GetModuleHandleA("ntdll.dll");
+
+    static _NtQueryInformationProcess query = (_NtQueryInformationProcess)GetProcAddress(hNtdll, "NtQueryInformationProcess");
+
+    NTSTATUS result = query(memHandle, ProcessBasicInformation, &processInformation, sizeof(PROCESS_BASIC_INFORMATION), &written);
+
+    return reinterpret_cast<uintptr_t>(processInformation.PebBaseAddress);
+}
+
 inline bool mem::getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info) {
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
-    if (snapshot == INVALID_HANDLE_VALUE) {
+    
+    uintptr_t pebAddress = getPEB();
+
+    if (pebAddress == NULL)
         return false;
+
+    uintptr_t PEBldrAddress = pebAddress + offsetof(PEB, PEB::Ldr);
+    uintptr_t PEBldr = 0;
+    read(PEBldrAddress, &PEBldr, sizeof(uintptr_t));
+
+    uintptr_t moduleListHead = PEBldr + offsetof(PEB_LDR_DATA, PEB_LDR_DATA::InMemoryOrderModuleList);
+
+    uintptr_t currentLink = 0;
+    read(moduleListHead, &currentLink, sizeof(uintptr_t));
+
+    while (currentLink != moduleListHead)
+    {
+		uintptr_t entryBase = currentLink - offsetof(LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
+
+
+        // https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/ntldr/ldr_data_table_entry.htm
+        UNICODE_STRING dllString;
+        // base dll name is directly after full dll name
+        uintptr_t linkDllNameAddress = entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::FullDllName) + sizeof(UNICODE_STRING);
+
+        // this is going to give an incorrect pointer to the string located inside dllString
+        // however the length will be correct, so the length will be used to construct our own string with the contents
+        // of the original
+        read(linkDllNameAddress, &dllString, sizeof(UNICODE_STRING));
+
+		size_t charCount = (dllString.Length / sizeof(wchar_t)) + 1;
+		std::vector<wchar_t> dllName(charCount, L'\0');
+
+		read(reinterpret_cast<uintptr_t>(dllString.Buffer), dllName.data(), dllString.Length);
+
+        if (wcscmp(moduleName, dllName.data()) == 0)
+        {
+	        // found it!!!
+
+            uintptr_t baseAddress = 0;
+            read(entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::DllBase), &baseAddress, sizeof(baseAddress));
+
+
+			ULONG moduleSize = 0;
+            // reserved in winternl but SizeOfImage
+			read(entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::DllBase) + 0x10, &moduleSize, sizeof(moduleSize));
+
+
+            info->base = baseAddress;
+            info->size = moduleSize;
+
+            return true;
+        }
+        read(currentLink, &currentLink, sizeof(currentLink));
     }
 
-    MODULEENTRY32W entry = {};
-    entry.dwSize = sizeof(MODULEENTRY32W);
+    //HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
+    //if (snapshot == INVALID_HANDLE_VALUE) {
+    //    return false;
+    //}
 
-    if (Module32FirstW(snapshot, &entry)) {
-        do {
-            if (wcsstr(moduleName, entry.szModule)) {
-                info->base = (uintptr_t)entry.modBaseAddr;
-                info->size = entry.modBaseSize;
-                return true;
-            }
-        } while (Module32NextW(snapshot, &entry));
-    }
+    //MODULEENTRY32W entry = {};
+    //entry.dwSize = sizeof(MODULEENTRY32W);
 
-    CloseHandle(snapshot);
+    //if (Module32FirstW(snapshot, &entry)) {
+    //    do {
+    //        if (wcsstr(moduleName, entry.szModule)) {
+    //            info->base = (uintptr_t)entry.modBaseAddr;
+    //            info->size = entry.modBaseSize;
+    //            return true;
+    //        }
+    //    } while (Module32NextW(snapshot, &entry));
+    //}
+
+    //CloseHandle(snapshot);
 
     return false;
 }
