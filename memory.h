@@ -134,7 +134,7 @@ inline bool mem::rttiInfo(uintptr_t address, std::string& out) {
     return true;
 }
 
-inline bool mem::isPointer(uintptr_t address, pointerInfo* info) {
+DECLSPEC_NOINLINE bool mem::isPointer(uintptr_t address, pointerInfo* info) {
 	for (auto& module : moduleList) {
 		if (module.base <= address && address <= module.base + module.size) {
 			info->moduleName = module.name;
@@ -187,32 +187,53 @@ inline bool mem::getProcessList() {
 }
 
 inline void mem::getModules() {
-    moduleList.clear();
+	moduleList.clear();
 
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, g_pid);
-    if (snapshot == INVALID_HANDLE_VALUE) {
-        return;
-    }
+	uintptr_t pebAddress = getPEB();
+	if (pebAddress == NULL)
+		return;
 
-    MODULEENTRY32W entry = {};
-    entry.dwSize = sizeof(MODULEENTRY32W);
+	uintptr_t PEBldrAddress = pebAddress + offsetof(PEB, PEB::Ldr);
+	uintptr_t PEBldr = 0;
+	read(PEBldrAddress, &PEBldr, sizeof(uintptr_t));
 
-    if (Module32FirstW(snapshot, &entry)) {
-        do {
-            std::wstring entryName = entry.szModule;
-            moduleInfo info;
-            info.name = std::string(entryName.begin(), entryName.end());
-            info.base = (uintptr_t)entry.modBaseAddr;
-            info.size = entry.modBaseSize;
-            getSections(info, info.sections);
+	uintptr_t moduleListHead = PEBldr + offsetof(PEB_LDR_DATA, PEB_LDR_DATA::InMemoryOrderModuleList);
+	uintptr_t currentLink = 0;
+	read(moduleListHead, &currentLink, sizeof(uintptr_t));
 
-            moduleList.push_back(info);
-        } while (Module32NextW(snapshot, &entry));
-    }
+	while (currentLink != moduleListHead)
+	{
+		uintptr_t entryBase = currentLink - offsetof(LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
 
-    CloseHandle(snapshot);
+		// BaseDllName is immediately after FullDllName
+		UNICODE_STRING dllString;
+		uintptr_t linkDllNameAddress = entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::FullDllName) + sizeof(UNICODE_STRING);
+		read(linkDllNameAddress, &dllString, sizeof(UNICODE_STRING));
 
-    return;
+		size_t charCount = (dllString.Length / sizeof(wchar_t)) + 1;
+		std::vector<wchar_t> dllName(charCount, L'\0');
+		read(reinterpret_cast<uintptr_t>(dllString.Buffer), dllName.data(), dllString.Length);
+
+		uintptr_t baseAddress = 0;
+		read(entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::DllBase), &baseAddress, sizeof(baseAddress));
+
+		ULONG moduleSize = 0;
+		// reserved in winternl but SizeOfImage
+		read(entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::DllBase) + 0x10, &moduleSize, sizeof(moduleSize));
+
+		std::wstring lDllNameW(dllName.begin(), dllName.end());
+		moduleInfo info;
+		info.name = std::string(lDllNameW.begin(), lDllNameW.end());
+		info.base = baseAddress;
+		info.size = moduleSize;
+
+		getSections(info, info.sections);
+		moduleList.push_back(info);
+
+		read(currentLink, &currentLink, sizeof(currentLink));
+	}
+
+	return;
 }
 
 inline void mem::getSections(const moduleInfo& info, std::vector<moduleSection>& dest) {
@@ -256,83 +277,68 @@ inline uintptr_t mem::getPEB()
 }
 
 inline bool mem::getModuleInfo(DWORD pid, const wchar_t* moduleName, moduleInfo* info) {
-    
-    uintptr_t pebAddress = getPEB();
 
-    if (pebAddress == NULL)
-        return false;
+	uintptr_t pebAddress = getPEB();
 
-    uintptr_t PEBldrAddress = pebAddress + offsetof(PEB, PEB::Ldr);
-    uintptr_t PEBldr = 0;
-    read(PEBldrAddress, &PEBldr, sizeof(uintptr_t));
+	if (pebAddress == NULL)
+		return false;
 
-    uintptr_t moduleListHead = PEBldr + offsetof(PEB_LDR_DATA, PEB_LDR_DATA::InMemoryOrderModuleList);
+	uintptr_t PEBldrAddress = pebAddress + offsetof(PEB, PEB::Ldr);
+	uintptr_t PEBldr = 0;
+	read(PEBldrAddress, &PEBldr, sizeof(uintptr_t));
 
-    uintptr_t currentLink = 0;
-    read(moduleListHead, &currentLink, sizeof(uintptr_t));
+	uintptr_t moduleListHead = PEBldr + offsetof(PEB_LDR_DATA, PEB_LDR_DATA::InMemoryOrderModuleList);
 
-    while (currentLink != moduleListHead)
-    {
+	uintptr_t currentLink = 0;
+	read(moduleListHead, &currentLink, sizeof(uintptr_t));
+
+	while (currentLink != moduleListHead)
+	{
 		uintptr_t entryBase = currentLink - offsetof(LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
 
 
-        // https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/ntldr/ldr_data_table_entry.htm
-        UNICODE_STRING dllString;
-        // base dll name is directly after full dll name
-        uintptr_t linkDllNameAddress = entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::FullDllName) + sizeof(UNICODE_STRING);
+		// https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/ntldr/ldr_data_table_entry.htm
+		UNICODE_STRING dllString;
+		// base dll name is directly after full dll name
+		uintptr_t linkDllNameAddress = entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::FullDllName) + sizeof(UNICODE_STRING);
 
-        // this is going to give an incorrect pointer to the string located inside dllString
-        // however the length will be correct, so the length will be used to construct our own string with the contents
-        // of the original
-        read(linkDllNameAddress, &dllString, sizeof(UNICODE_STRING));
+		// this is going to give an incorrect pointer to the string located inside dllString
+		// however the length will be correct, so the length will be used to construct our own string with the contents
+		// of the original
+		read(linkDllNameAddress, &dllString, sizeof(UNICODE_STRING));
 
 		size_t charCount = (dllString.Length / sizeof(wchar_t)) + 1;
 		std::vector<wchar_t> dllName(charCount, L'\0');
 
 		read(reinterpret_cast<uintptr_t>(dllString.Buffer), dllName.data(), dllString.Length);
 
-        if (wcscmp(moduleName, dllName.data()) == 0)
-        {
-	        // found it!!!
+		uintptr_t baseAddress = 0;
+		read(entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::DllBase), &baseAddress, sizeof(baseAddress));
 
-            uintptr_t baseAddress = 0;
-            read(entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::DllBase), &baseAddress, sizeof(baseAddress));
+		ULONG moduleSize = 0;
 
+		// reserved in winternl but SizeOfImage
+		read(entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::DllBase) + 0x10, &moduleSize, sizeof(moduleSize));
 
-			ULONG moduleSize = 0;
-            // reserved in winternl but SizeOfImage
-			read(entryBase + offsetof(LDR_DATA_TABLE_ENTRY, LDR_DATA_TABLE_ENTRY::DllBase) + 0x10, &moduleSize, sizeof(moduleSize));
+		std::wstring lDllNameW(dllName.begin(), dllName.end());
+		std::string lDllName(lDllNameW.begin(), lDllNameW.end());
 
+		if (wcscmp(moduleName, dllName.data()) == 0)
+		{
+			// found it!!!
 
-            info->base = baseAddress;
-            info->size = moduleSize;
+			info->base = baseAddress;
+			info->size = moduleSize;
+			info->name = lDllName;
 
-            return true;
-        }
-        read(currentLink, &currentLink, sizeof(currentLink));
-    }
+			getSections(*info, info->sections);
 
-    //HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
-    //if (snapshot == INVALID_HANDLE_VALUE) {
-    //    return false;
-    //}
+			return true;
+		}
+		read(currentLink, &currentLink, sizeof(currentLink));
+	}
 
-    //MODULEENTRY32W entry = {};
-    //entry.dwSize = sizeof(MODULEENTRY32W);
-
-    //if (Module32FirstW(snapshot, &entry)) {
-    //    do {
-    //        if (wcsstr(moduleName, entry.szModule)) {
-    //            info->base = (uintptr_t)entry.modBaseAddr;
-    //            info->size = entry.modBaseSize;
-    //            return true;
-    //        }
-    //    } while (Module32NextW(snapshot, &entry));
-    //}
-
-    //CloseHandle(snapshot);
-
-    return false;
+	return false;
 }
 
 inline HANDLE mem::openHandle(const DWORD pid) {
