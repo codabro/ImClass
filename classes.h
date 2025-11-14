@@ -519,7 +519,8 @@ inline void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 
 	std::string numText = ui::toHexString(num, 0);
 
-	std::string toDraw = ("0x" + numText);
+	std::string targetAddress = ("0x" + numText);
+	std::string toDraw;
 
 	pointerInfo info;
 	bool isPointer = mem::isPointer(num, &info);
@@ -527,16 +528,16 @@ inline void uClass::drawHexNumber(int i, uintptr_t num, uintptr_t* ptrOut) {
 		color = ImColor(255, 0, 0);
 
 		if (info.moduleName == "") {
-			toDraw = "[heap] " + toDraw;
+			toDraw = "[heap] " + targetAddress;
 		}
 		else {
 			auto exportIt = mem::g_ExportMap.find(num);
 			if (exportIt != mem::g_ExportMap.end()) {
 				color = ImColor(0, 255, 0);
-				toDraw = "[EXPORT] " + exportIt->second + " " + toDraw;
+				toDraw = "[EXPORT] " + exportIt->second + " " + targetAddress;
 			}
 			else {
-				toDraw = std::format("[{}] {} {}", info.section, info.moduleName, toDraw);
+				toDraw = std::format("[{}] {} {}", info.section, info.moduleName, targetAddress);
 			}
 		}
 
