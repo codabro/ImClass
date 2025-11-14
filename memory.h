@@ -138,6 +138,10 @@ DECLSPEC_NOINLINE bool mem::isPointer(uintptr_t address, pointerInfo* info) {
 	for (auto& module : moduleList) {
 		if (module.base <= address && address <= module.base + module.size) {
 			info->moduleName = module.name;
+
+			// default to unknown as pointers to places like the pe header don't get caught by any of these cases
+			strcpy_s(info->section, 8, "UNK");
+
 			for (auto& section : module.sections) {
 				if (section.base <= address && address < section.base + section.size) {
 					memcpy(info->section, section.name, 8);
