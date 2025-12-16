@@ -43,6 +43,7 @@ namespace ui {
 	void renderStringScan();
     void updateAddressBox(char* dest, char* src);
     void cleanDeadProcess();
+    void renderModals();
 }
 
 // reused for small tool windows
@@ -234,6 +235,22 @@ void ui::updateAddress(uintptr_t newAddress, uintptr_t* dest) {
             *dest = newAddress;
         }
     }
+}
+
+void ui::renderModals()
+{
+	if (showModuleMissingPopup) {
+		ImGui::OpenPopup("Module Missing");
+		showModuleMissingPopup = false;
+	}
+
+	if (ImGui::BeginPopup("Module Missing"))
+	{
+		ImGui::Text("The selected address is not inside a module!");
+		if (ImGui::Button("Close"))
+			ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+	}
 }
 
 void ui::renderMain() {
@@ -457,6 +474,7 @@ void ui::render() {
     renderSignatureScan();
     renderSignatureResults();    
 	renderStringScan();
+	renderModals();
 }
 
 void ui::init(HWND hwnd) {

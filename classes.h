@@ -710,6 +710,8 @@ inline void uClass::drawStringBytes(int i, const BYTE* lData, int pos, int lSize
 	}
 }
 
+inline bool showModuleMissingPopup = false;
+
 inline void uClass::drawControllers(int i, int counter) {
 	auto& node = nodes[i];
 
@@ -877,9 +879,46 @@ inline void uClass::drawControllers(int i, int counter) {
 				}
 			}
 		}
-		if (ImGui::Selectable("Copy Address")) {
-			ImGui::SetClipboardText(ui::toHexString(this->address + counter, 0).c_str());
+
+
+		if (ImGui::BeginMenu("Copy")) {
+
+			if (ImGui::Selectable("Address")) {
+				ImGui::SetClipboardText(ui::toHexString(this->address + counter, 0).c_str());
+			}
+
+			if (ImGui::Selectable("Offset")) {
+				ImGui::SetClipboardText(ui::toHexString(counter, 0).c_str());
+			}
+
+			if (ImGui::Selectable("RVA")) {
+
+				uintptr_t fullAddress = this->address + counter;
+
+				// refresh loaded modules
+				mem::getModules();
+
+				bool foundIt = false;
+
+				for (auto module : mem::moduleList)
+				{
+					if (fullAddress >= module.base && fullAddress <= module.base + module.size)
+					{
+						foundIt = true;
+						ImGui::SetClipboardText(ui::toHexString(fullAddress - module.base, 0).c_str());
+						break;
+					}
+				}
+
+				if (!foundIt) {
+					// the RVA was not found for any loaded modules, indicate this for the user
+					showModuleMissingPopup = true;
+				}
+			}
+
+			ImGui::EndMenu();
 		}
+
 		ImGui::EndPopup();
 	}
 }
