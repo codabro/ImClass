@@ -883,8 +883,10 @@ inline void uClass::drawControllers(int i, int counter) {
 
 		if (ImGui::BeginMenu("Copy")) {
 
+			uintptr_t fullAddress = this->address + counter;
+
 			if (ImGui::Selectable("Address")) {
-				ImGui::SetClipboardText(ui::toHexString(this->address + counter, 0).c_str());
+				ImGui::SetClipboardText(ui::toHexString(fullAddress, 0).c_str());
 			}
 
 			if (ImGui::Selectable("Offset")) {
@@ -893,7 +895,6 @@ inline void uClass::drawControllers(int i, int counter) {
 
 			if (ImGui::Selectable("RVA")) {
 
-				uintptr_t fullAddress = this->address + counter;
 
 				// refresh loaded modules
 				mem::getModules();
@@ -906,6 +907,31 @@ inline void uClass::drawControllers(int i, int counter) {
 					{
 						foundIt = true;
 						ImGui::SetClipboardText(ui::toHexString(fullAddress - module.base, 0).c_str());
+						break;
+					}
+				}
+
+				if (!foundIt) {
+					// the RVA was not found for any loaded modules, indicate this for the user
+					showModuleMissingPopup = true;
+				}
+			}
+
+			if (ImGui::Selectable("Full RVA")) {
+
+
+				// refresh loaded modules
+				mem::getModules();
+
+				bool foundIt = false;
+
+				for (auto module : mem::moduleList)
+				{
+					if (fullAddress >= module.base && fullAddress <= module.base + module.size)
+					{
+						foundIt = true;
+						std::string fullName = std::format("{} + 0x{:X}", module.name.c_str(), fullAddress - module.base);
+						ImGui::SetClipboardText(fullName.c_str());
 						break;
 					}
 				}
