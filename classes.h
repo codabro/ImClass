@@ -125,6 +125,10 @@ public:
 	size_t size;
 	BYTE* data = 0;
 	float cur_pad = 0;
+	std::vector<float> totalHeight;
+	size_t lastNodeCount = 0;
+	size_t lastTypeHash = 0;
+
 
 	uClass(int nodeCount, bool incrementCounter = true) {
 		size = 0;
@@ -187,6 +191,8 @@ public:
 	void drawBool(int i, bool value);
 
 	std::string exportClass();
+
+	void recalculateHeights();
 };
 
 inline uClass g_PreviewClass(15);
@@ -506,6 +512,8 @@ inline void uClass::changeType(int i, nodeType newType, bool selectNew, int* new
 	}
 
 	sizeToNodes();
+
+	lastTypeHash = 0;
 
 	if (newNodes) {
 		*newNodes = inserted - 1;
@@ -949,6 +957,34 @@ inline void uClass::drawControllers(int i, int counter) {
 	}
 }
 
+inline void uClass::recalculateHeights() {
+	float baseHeight = ImGui::GetTextLineHeightWithSpacing();
+
+	totalHeight.resize(nodes.size() + 1);
+	totalHeight[0] = 0.0f;
+
+	for (size_t i = 0; i < nodes.size(); i++) {
+		float nodeHeight = baseHeight;
+
+
+		// TODO: probably switch these to use macros in all use cases for matrix height eventually
+		switch (nodes[i].type) {
+		case node_matrix4x4:
+			nodeHeight = 15.0f * 4.0f + 8.0f;
+			break;
+		case node_matrix3x4:
+		case node_matrix3x3:
+			nodeHeight = 15.0f * 3.0f + 8.0f;
+			break;
+		default:
+			break;
+		}
+
+		totalHeight[i + 1] = totalHeight[i] + nodeHeight;
+	}
+}
+
+
 inline void uClass::drawNodes() {
 	mem::read(this->address, this->data, this->size);
 
@@ -956,142 +992,179 @@ inline void uClass::drawNodes() {
 
 	uintptr_t clickedPointer = 0;
 
-	ImGuiListClipper clipper;
-	clipper.Begin( static_cast<int>(nodes.size()) );
-	while (clipper.Step()) {
-		int counter = 0;
-		for (int i = 0; i < clipper.DisplayStart; i++) {
-			auto& node = nodes[i];
-			counter += node.size;
+	size_t typeHash = 0;
+	for (size_t i = 0; i < nodes.size(); i++) {
+		typeHash ^= (static_cast<size_t>(nodes[i].type) << (i % 8));
+	}
+
+	if (lastNodeCount != nodes.size() || lastTypeHash != typeHash) {
+		recalculateHeights();
+		lastNodeCount = nodes.size();
+		lastTypeHash = typeHash;
+	}
+
+	float scrollY = ImGui::GetScrollY();
+	float windowHeight = ImGui::GetWindowHeight();
+
+
+
+	int startIdx = 0, endIdx = nodes.size();
+
+	for (int i = 0; i < nodes.size(); i++) {
+		if (totalHeight[i + 1] >= scrollY) {
+			startIdx = i;
+			break;
+		}
+	}
+
+	for (int i = startIdx; i < nodes.size(); i++) {
+		if (totalHeight[i] > scrollY + windowHeight) {
+
+			// render 10 more rows than necessary, just to avoid some weird clipping with tons of matrices
+			// still clipping elements for performance, but it doesn't really matter if an extra few get rendered unnecessarily
+			endIdx = min(i + 10, static_cast<int>(nodes.size()));
+			break;
+		}
+	}
+
+	if (startIdx > 0) {
+		ImGui::Dummy(ImVec2(0.0f, totalHeight[startIdx]));
+	}
+
+	int counter = 0;
+	for (int i = 0; i < startIdx; i++) {
+		counter += nodes[i].size;
+	}
+
+	for (int i = startIdx; i < endIdx; i++) {
+		auto& node = nodes[i];
+
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+		ImGui::BeginChild(("Node_" + std::to_string(i)).c_str(), ImVec2((this == &g_PreviewClass) ? 1100 : parentSize.x, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_AlwaysUseWindowPadding);
+		ImGui::PopStyleVar();
+
+		drawOffset(i, counter);
+		drawAddress(i, counter);
+
+		size_t lCounter = 0;
+		cur_pad = 0;
+
+		auto dataPos = reinterpret_cast<std::uint8_t*>(data) + counter;
+
+		switch (node.type) {
+		case node_hex8:
+		{
+			drawStringBytes(i, data, counter, 1);
+			drawBytes(i, data, counter, 1);
+
+			auto num = *reinterpret_cast<int8_t*>(dataPos);
+			drawNumber(i, num);
+			drawHexNumber(i, num);
+			break;
+		}
+		case node_hex16:
+		{
+			drawStringBytes(i, data, counter, 2);
+			drawBytes(i, data, counter, 2);
+
+			auto num = *reinterpret_cast<int16_t*>(dataPos);
+			drawNumber(i, num);
+			drawHexNumber(i, num);
+			break;
+		}
+		case node_hex32:
+		{
+			drawStringBytes(i, data, counter, 4);
+			drawBytes(i, data, counter, 4);
+
+			auto fNum = *reinterpret_cast<float*>(dataPos);
+			drawFloat(i, fNum);
+
+			auto num = *reinterpret_cast<int32_t*>(dataPos);
+			drawNumber(i, num);
+			drawHexNumber(i, num, &clickedPointer);
+			break;
+		}
+		case node_hex64:
+		{
+			drawStringBytes(i, data, counter, 8);
+			drawBytes(i, data, counter, 8);
+
+			auto dNum = *reinterpret_cast<double*>(dataPos);
+			drawDouble(i, dNum);
+
+			auto num = *reinterpret_cast<int64_t*>(dataPos);
+			drawNumber(i, num);
+			drawHexNumber(i, num, &clickedPointer);
+			break;
+		}
+		case node_int64:
+			drawInteger(i, *reinterpret_cast<int64_t*>(dataPos), node_int64);
+			break;
+		case node_int32:
+			drawInteger(i, *reinterpret_cast<int32_t*>(dataPos), node_int32);
+			break;
+		case node_int16:
+			drawInteger(i, *reinterpret_cast<int16_t*>(dataPos), node_int16);
+			break;
+		case node_int8:
+			drawInteger(i, *reinterpret_cast<int8_t*>(dataPos), node_int8);
+			break;
+		case node_uint64:
+			drawUInteger(i, *reinterpret_cast<uint64_t*>(dataPos), node_uint64);
+			break;
+		case node_uint32:
+			drawUInteger(i, *reinterpret_cast<uint32_t*>(dataPos), node_uint32);
+			break;
+		case node_uint16:
+			drawUInteger(i, *reinterpret_cast<uint16_t*>(dataPos), node_uint16);
+			break;
+		case node_uint8:
+			drawUInteger(i, *reinterpret_cast<uint8_t*>(dataPos), node_uint8);
+			break;
+		case node_float:
+			drawFloatVar(i, *reinterpret_cast<float*>(dataPos));
+			break;
+		case node_double:
+			drawDoubleVar(i, *reinterpret_cast<double*>(dataPos));
+			break;
+		case node_vector4:
+			drawVector4(i, *reinterpret_cast<Vector4*>(dataPos));
+			break;
+		case node_vector3:
+			drawVector3(i, *reinterpret_cast<Vector3*>(dataPos));
+			break;
+		case node_vector2:
+			drawVector2(i, *reinterpret_cast<Vector2*>(dataPos));
+			break;
+		case node_matrix4x4:
+			drawMatrix4x4(i, *reinterpret_cast<Matrix4x4*>(dataPos));
+			break;
+		case node_matrix3x4:
+			drawMatrix3x4(i, *reinterpret_cast<Matrix3x4*>(dataPos));
+			break;
+		case node_matrix3x3:
+			drawMatrix3x3(i, *reinterpret_cast<Matrix3x3*>(dataPos));
+			break;
+		case node_bool:
+			drawBool(i, *reinterpret_cast<bool*>(dataPos));
+			break;
 		}
 
-		for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-			auto& node = nodes[i];
+		drawControllers(i, counter);
 
-			ImVec2 startPos = ImGui::GetCursorPos();
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-			ImGui::BeginChild(("Node_" + std::to_string(i)).c_str(), ImVec2((this == &g_PreviewClass) ? 1100 : parentSize.x, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_AlwaysUseWindowPadding);
-			ImGui::PopStyleVar();
+		ImGui::EndChild();
 
-			drawOffset(i, counter);
-			drawAddress(i, counter);
-
-			size_t lCounter = 0;
-			cur_pad = 0;
-
-			// this kinda sucks
-			auto dataPos = reinterpret_cast<std::uint8_t*>(data) + counter;
-
-			switch (node.type) {
-			case node_hex8:
-			{
-				drawStringBytes(i, data, counter, 1);
-				drawBytes(i, data, counter, 1);
-
-				auto num = *reinterpret_cast<int8_t*>(dataPos);
-				drawNumber(i, num);
-				drawHexNumber(i, num);
-				break;
-			}
-			case node_hex16:
-			{
-				drawStringBytes(i, data, counter, 2);
-				drawBytes(i, data, counter, 2);
-
-				auto num = *reinterpret_cast<int16_t*>(dataPos);
-				drawNumber(i, num);
-				drawHexNumber(i, num);
-				break;
-			}
-			case node_hex32:
-			{
-				drawStringBytes(i, data, counter, 4);
-				drawBytes(i, data, counter, 4);
-
-				auto fNum = *reinterpret_cast<float*>(dataPos);
-				drawFloat(i, fNum);
-
-				auto num = *reinterpret_cast<int32_t*>(dataPos);
-				drawNumber(i, num);
-				drawHexNumber(i, num, &clickedPointer);
-				break;
-			}
-			case node_hex64:
-			{
-				drawStringBytes(i, data, counter, 8);
-				drawBytes(i, data, counter, 8);
-
-				auto dNum = *reinterpret_cast<double*>(dataPos);
-				drawDouble(i, dNum);
-
-				auto num = *reinterpret_cast<int64_t*>(dataPos);
-				drawNumber(i, num);
-				drawHexNumber(i, num, &clickedPointer);
-				break;
-			}
-			case node_int64:
-				drawInteger(i, *reinterpret_cast<int64_t*>(dataPos), node_int64);
-				break;
-			case node_int32:
-				drawInteger(i, *reinterpret_cast<int32_t*>(dataPos), node_int32);
-				break;
-			case node_int16:
-				drawInteger(i, *reinterpret_cast<int16_t*>(dataPos), node_int16);
-				break;
-			case node_int8:
-				drawInteger(i, *reinterpret_cast<int8_t*>(dataPos), node_int8);
-				break;
-			case node_uint64:
-				drawUInteger(i, *reinterpret_cast<uint64_t*>(dataPos), node_uint64);
-				break;
-			case node_uint32:
-				drawUInteger(i, *reinterpret_cast<uint32_t*>(dataPos), node_uint32);
-				break;
-			case node_uint16:
-				drawUInteger(i, *reinterpret_cast<uint16_t*>(dataPos), node_uint16);
-				break;
-			case node_uint8:
-				drawUInteger(i, *reinterpret_cast<uint8_t*>(dataPos), node_uint8);
-				break;
-			case node_float:
-				drawFloatVar(i, *reinterpret_cast<float*>(dataPos));
-				break;
-			case node_double:
-				drawDoubleVar(i, *reinterpret_cast<double*>(dataPos));
-				break;
-			case node_vector4:
-				drawVector4(i, *reinterpret_cast<Vector4*>(dataPos));
-				break;
-			case node_vector3:
-				drawVector3(i, *reinterpret_cast<Vector3*>(dataPos));
-				break;
-			case node_vector2:
-				drawVector2(i, *reinterpret_cast<Vector2*>(dataPos));
-				break;
-			case node_matrix4x4:
-				drawMatrix4x4(i, *reinterpret_cast<Matrix4x4*>(dataPos));
-				break;
-			case node_matrix3x4:
-				drawMatrix3x4(i, *reinterpret_cast<Matrix3x4*>(dataPos));
-				break;
-			case node_matrix3x3:
-				drawMatrix3x3(i, *reinterpret_cast<Matrix3x3*>(dataPos));
-				break;
-			case node_bool:
-				drawBool(i, *reinterpret_cast<bool*>(dataPos));
-				break;
-			}
-
-			drawControllers(i, counter);
-
-			ImGui::EndChild();
-
-			if (node.type >= node_max) {
-				continue;
-			}
-
+		if (node.type < node_max) {
 			counter += node.size;
 		}
+	}
+
+
+	// need to add a dummy before and after what is rendered to ensure the scroll position stays the same regardless of which elements are occluded
+	if (endIdx < static_cast<int>(nodes.size())) {
+		float remainingHeight = totalHeight[nodes.size()] - totalHeight[endIdx];
+		ImGui::Dummy(ImVec2(0.0f, remainingHeight));
 	}
 
 	static bool oHoveringPointer = false;
